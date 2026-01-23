@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply text-charcoal-900 bg-charcoal-50;
+  }
+}
+
+@layer utilities {
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out forwards;
+  }
+
+  .animate-modal-in {
+    animation: modal-in 0.2s ease-out forwards;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out forwards;
+  }
+}
+
+@layer components {
+  .input-base {
+    @apply w-full px-3 py-2 border border-charcoal-200 rounded-lg
+           focus:ring-2 focus:ring-wine-500 focus:border-wine-500
+           outline-none transition-colors;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 bg-wine-900 text-white rounded-lg
+           hover:bg-wine-800 disabled:opacity-50 disabled:cursor-not-allowed
+           font-medium transition-colors;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 border border-charcoal-200 text-charcoal-700
+           rounded-lg hover:bg-charcoal-50 transition-colors font-medium;
+  }
+
+  .card {
+    @apply bg-white rounded-xl border border-charcoal-100;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d1d1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
