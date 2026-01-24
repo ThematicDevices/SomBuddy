@@ -26,8 +26,8 @@ export function Layout() {
                 <Wine className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-display font-bold text-charcoal-900">Sommelier</h1>
-                <p className="text-[10px] sm:text-xs text-charcoal-500 hidden sm:block">Your Personal Wine Catalog</p>
+                <h1 className="text-lg sm:text-xl font-display font-bold text-charcoal-900">Som Buddy</h1>
+                  <p className="text-[10px] sm:text-xs text-charcoal-500 hidden sm:block">Your Personal Wine Catalog</p>
               </div>
             </div>
 

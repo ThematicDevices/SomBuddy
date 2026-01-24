@@ -14,7 +14,17 @@ import {
   CheckCircle,
 } from 'lucide-react';
 
-const COLORS = ['#722f37', '#ae214c', '#d02d5f', '#e44d77', '#ef7899', '#f6abbe'];
+// Wine type color mapping for pie chart
+const WINE_TYPE_COLORS: Record<string, string> = {
+  red: '#722f37',      // Deep wine red
+  white: '#F5E6C8',    // Straw/white wine color
+  rosé: '#F4B8C5',     // Pink rosé
+  sparkling: '#FFF8DC', // Champagne gold
+  dessert: '#DAA520',   // Golden amber
+  fortified: '#8B4513', // Mahogany brown
+  orange: '#E8A954',    // Orange wine
+};
+const FALLBACK_COLORS = ['#722f37', '#ae214c', '#d02d5f', '#e44d77', '#ef7899', '#f6abbe'];
 
 export function Dashboard() {
   const { wines } = useWines();
@@ -156,8 +166,8 @@ export function Dashboard() {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {colorData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    {colorData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={WINE_TYPE_COLORS[entry.name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -168,11 +178,11 @@ export function Dashboard() {
               </ResponsiveContainer>
             </div>
             <div className="flex flex-wrap gap-3 justify-center mt-2">
-              {colorData.map((item, index) => (
+              {colorData.map((item) => (
                 <div key={item.name} className="flex items-center gap-2 text-sm">
                   <div
                     className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    style={{ backgroundColor: WINE_TYPE_COLORS[item.name] || FALLBACK_COLORS[0] }}
                   />
                   <span className="text-charcoal-600 capitalize">{item.name}</span>
                 </div>

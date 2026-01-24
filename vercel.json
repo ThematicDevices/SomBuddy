@@ -5,8 +5,17 @@
   "functions": {
     "api/claude-proxy.ts": {
       "maxDuration": 60
+    },
+    "api/update-prices.ts": {
+      "maxDuration": 300
     }
   },
+  "crons": [
+    {
+      "path": "/api/update-prices",
+      "schedule": "0 23 * * 0"
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/" }
   ]

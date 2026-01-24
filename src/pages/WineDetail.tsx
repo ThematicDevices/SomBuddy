@@ -12,6 +12,7 @@ import {
   getDrinkingStatusLabel,
   getWineColorClass,
   calculateDrinkingStatus,
+  enrichWineData,
 } from '../utils';
 import {
   ArrowLeft,
@@ -27,6 +28,9 @@ import {
   GlassWater,
   Plus,
   X,
+  RefreshCw,
+  TrendingUp,
+  Loader2,
 } from 'lucide-react';
 
 export function WineDetail() {
@@ -43,6 +47,7 @@ export function WineDetail() {
   const [showTastingModal, setShowTastingModal] = useState(false);
   const [tastingNotes, setTastingNotes] = useState('');
   const [tastingRating, setTastingRating] = useState<number>(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   if (!wine) {
     return (
@@ -135,6 +140,43 @@ export function WineDetail() {
     updateWine({ ...wine, quantity: newQuantity });
   };
 
+  const handleRefreshInfo = async () => {
+    setIsRefreshing(true);
+    try {
+      const enrichedData = await enrichWineData({
+        producer: wine.producer,
+        wineName: wine.wineName,
+        vintage: wine.vintage,
+        region: wine.region,
+        country: wine.country,
+        varietals: wine.varietals,
+      });
+
+      updateWine({
+        ...wine,
+        // Update market value with new estimated price
+        estimatedValue: enrichedData.estimatedPrice,
+        // Update drinking window if provided
+        drinkingWindowStart: enrichedData.drinkingWindowStart || wine.drinkingWindowStart,
+        drinkingWindowEnd: enrichedData.drinkingWindowEnd || wine.drinkingWindowEnd,
+        // Update pairing suggestions if provided
+        pairingSuggestions: enrichedData.pairingSuggestions?.length
+          ? enrichedData.pairingSuggestions
+          : wine.pairingSuggestions,
+        // Update story if provided and richer
+        story: enrichedData.story || wine.story,
+        dateModified: new Date().toISOString(),
+      });
+
+      showToast('Wine information refreshed with latest data!', 'success');
+    } catch (err) {
+      console.error('Error refreshing wine data:', err);
+      showToast(err instanceof Error ? err.message : 'Failed to refresh wine info', 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <button
@@ -191,7 +233,13 @@ export function WineDetail() {
                 {wine.purchasePrice && (
                   <span className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-charcoal-400" />
-                    {formatPrice(wine.purchasePrice)}
+                    Paid: {formatPrice(wine.purchasePrice)}
+                  </span>
+                )}
+                {wine.estimatedValue && (
+                  <span className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-green-500" />
+                    Market: {formatPrice(wine.estimatedValue)}
                   </span>
                 )}
                 {wine.storageLocation && (
@@ -264,6 +312,19 @@ export function WineDetail() {
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
+                </button>
+
+                <button
+                  onClick={handleRefreshInfo}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2 px-4 py-2 border border-green-200 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isRefreshing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  Refresh Info
                 </button>
               </div>
             </div>
