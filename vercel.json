@@ -2,6 +2,11 @@
   "buildCommand": "vite build",
   "installCommand": "npm install",
   "framework": "vite",
+  "functions": {
+    "api/claude-proxy.ts": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/" }
   ]

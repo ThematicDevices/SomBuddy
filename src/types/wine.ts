@@ -88,12 +88,15 @@ export interface WineFormData {
   purchasePrice?: number;
   purchaseDate?: string;
   purchasedFrom?: string;
+  estimatedValue?: number;
   storageLocation?: string;
   drinkingWindowStart?: number;
   drinkingWindowEnd?: number;
   whyPurchased?: string;
   pairingSuggestions: string[];
   labelImageBase64?: string;
+  story?: string;
+  tastingNotes?: TastingNote[];
 }
 
 export const createDefaultWine = (): WineFormData => ({

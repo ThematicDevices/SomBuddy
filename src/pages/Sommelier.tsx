@@ -37,14 +37,32 @@ export function Sommelier() {
     setIsLoading(true);
 
     try {
-      const conversationHistory = messages.map(m => ({
+      // Only include recent conversation history (last 10 messages) to reduce payload
+      const recentMessages = messages.slice(-10);
+      const conversationHistory = recentMessages.map(m => ({
         role: m.role,
         content: m.content,
       }));
 
+      // Send only essential wine fields to reduce payload size
+      const summarizedWines = wines.map(w => ({
+        id: w.id,
+        producer: w.producer,
+        wineName: w.wineName,
+        vintage: w.vintage,
+        region: w.region,
+        country: w.country,
+        varietals: w.varietals?.slice(0, 3), // Limit varietals
+        drinkingWindowStart: w.drinkingWindowStart,
+        drinkingWindowEnd: w.drinkingWindowEnd,
+        drinkingStatus: w.drinkingStatus,
+        purchasePrice: w.purchasePrice,
+        quantity: w.quantity,
+      }));
+
       const response = await getSommelierRecommendation(
         userMessage.content,
-        wines,
+        summarizedWines as typeof wines,
         conversationHistory
       );
 

@@ -4,10 +4,18 @@ const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 
 interface RequestBody {
-  action: 'extract-wine' | 'sommelier-chat';
+  action: 'extract-wine' | 'enrich-wine' | 'sommelier-chat';
   imageBase64?: string;
   mimeType?: string;
   userQuery?: string;
+  wineInfo?: {
+    producer?: string;
+    wineName?: string;
+    vintage?: number | null;
+    region?: string;
+    country?: string;
+    varietals?: Array<{ varietal: string; percentage?: number }>;
+  };
   wines?: Array<{
     id: string;
     producer: string;
@@ -24,6 +32,31 @@ interface RequestBody {
   }>;
   conversationHistory?: Array<{ role: string; content: string }>;
 }
+
+const WINE_EXTRACTION_SCHEMA = `{
+  "producer": "Producer/Winery name",
+  "wineName": "Name of the wine (cuvée or specific wine name, if different from producer)",
+  "vintage": 2020,
+  "region": "Wine region (e.g., Napa Valley, Bordeaux, Barossa Valley)",
+  "subRegion": "Sub-region or commune if known (e.g., Rutherford, Saint-Julien)",
+  "country": "Country of origin",
+  "appellation": "Specific appellation (e.g., AOC Margaux, DOC Barolo)",
+  "varietals": [{"varietal": "Grape variety", "percentage": 100}],
+  "wineColor": "red|white|rosé|sparkling|dessert|fortified|orange",
+  "alcoholContent": 14.5,
+  "estimatedPrice": 45.00,
+  "tastingNotes": [
+    {"category": "Aroma", "notes": "blackberry, cedar, vanilla"},
+    {"category": "Palate", "notes": "full-bodied, velvety tannins, long finish"},
+    {"category": "Appearance", "notes": "deep ruby with purple hues"}
+  ],
+  "drinkingWindowStart": 2024,
+  "drinkingWindowEnd": 2035,
+  "pairingSuggestions": ["grilled ribeye steak", "aged hard cheeses", "lamb chops"],
+  "wineStyle": "Full-bodied, oak-aged red with aging potential",
+  "criticScores": "Wine Advocate: 94, Wine Spectator: 92",
+  "story": "Brief background about the producer or wine's significance"
+}`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS preflight
@@ -44,29 +77,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error('Claude API key not configured');
     }
 
-    const { action, imageBase64, mimeType, userQuery, wines, conversationHistory } =
+    const { action, imageBase64, mimeType, userQuery, wineInfo, wines, conversationHistory } =
       req.body as RequestBody;
 
     let messages: unknown[];
     let systemPrompt: string;
 
     if (action === 'extract-wine') {
-      systemPrompt = `You are an expert sommelier and wine data extraction specialist. Your task is to analyze wine label images and extract detailed information about the wine.
+      const currentYear = new Date().getFullYear();
+
+      systemPrompt = `You are an expert sommelier and wine data extraction specialist with extensive knowledge of wines worldwide. Your task is to analyze wine label images and extract detailed information about the wine.
+
+CURRENT YEAR: ${currentYear}
+
+Based on the wine label AND your expert knowledge, provide comprehensive information including:
+- Basic details visible on the label
+- Estimated current market price (USD) based on your knowledge of similar wines
+- Professional tasting notes (aroma, palate, appearance)
+- Recommended drinking window based on vintage and wine style
+- Food pairing suggestions
+- Any notable critic scores you're aware of
+- Brief story or background about the producer/wine
 
 Always respond with valid JSON in this exact format:
-{
-  "producer": "Producer/Winery name",
-  "wineName": "Name of the wine (if different from producer)",
-  "vintage": 2020,
-  "region": "Wine region (e.g., Napa Valley, Bordeaux)",
-  "country": "Country of origin",
-  "appellation": "Specific appellation if visible",
-  "varietals": [{"varietal": "Grape variety", "percentage": 100}],
-  "wineColor": "red|white|rosé|sparkling|dessert|fortified|orange",
-  "alcoholContent": 14.5
-}
+${WINE_EXTRACTION_SCHEMA}
 
-If any field cannot be determined from the label, use null for numbers and empty string for strings.`;
+IMPORTANT GUIDELINES:
+- For drinking windows, consider the vintage year and wine style. Young everyday wines might be "drink now to +3 years", while fine wines could age 10-30+ years.
+- Estimate prices realistically based on region, producer reputation, and quality tier.
+- If any field cannot be determined, use null for numbers, empty string for strings, or empty array for arrays.
+- Be specific with tasting notes based on the grape varieties and region.
+- For varietals, if it's a blend and percentages aren't shown, estimate typical percentages for that wine style.`;
 
       messages = [
         {
@@ -82,9 +123,51 @@ If any field cannot be determined from the label, use null for numbers and empty
             },
             {
               type: 'text',
-              text: 'Please analyze this wine label and extract all visible information. Return the data as JSON.',
+              text: 'Please analyze this wine label and provide comprehensive information including tasting notes, estimated price, drinking window, and food pairings. Return the data as JSON.',
             },
           ],
+        },
+      ];
+    } else if (action === 'enrich-wine') {
+      const currentYear = new Date().getFullYear();
+      const { producer, wineName, vintage, region, country, varietals } = wineInfo || {};
+
+      const wineDescription = [
+        vintage ? `${vintage}` : '',
+        producer || '',
+        wineName || '',
+        varietals?.map(v => v.varietal).join(', ') || '',
+        region ? `from ${region}` : '',
+        country ? `(${country})` : ''
+      ].filter(Boolean).join(' ');
+
+      systemPrompt = `You are an expert sommelier with comprehensive knowledge of wines worldwide. Your task is to provide detailed information about a specific wine based on your expertise.
+
+CURRENT YEAR: ${currentYear}
+
+The user is adding this wine to their collection:
+${wineDescription}
+
+Based on your knowledge of this wine (or similar wines if this exact wine is unknown), provide comprehensive information.
+
+Always respond with valid JSON in this exact format:
+${WINE_EXTRACTION_SCHEMA}
+
+IMPORTANT GUIDELINES:
+- Fill in any missing basic information you know about this wine
+- Estimate current market price (USD) based on producer reputation and quality tier
+- Provide professional tasting notes typical for this wine style
+- Calculate drinking window: start year should be when it begins drinking well, end year when it will likely decline
+- Suggest food pairings that complement the wine style
+- Include critic scores if you're aware of any for this wine or vintage
+- Add any interesting background about the producer or wine
+- If information is uncertain, provide your best estimate based on similar wines
+- For unknown/obscure wines, base estimates on the region and grape varieties`;
+
+      messages = [
+        {
+          role: 'user',
+          content: `Please provide comprehensive information about this wine: ${wineDescription}. Include estimated price, tasting notes, drinking window, food pairings, and any background information. Return the data as JSON.`,
         },
       ];
     } else if (action === 'sommelier-chat') {

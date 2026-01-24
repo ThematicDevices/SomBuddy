@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ImageUpload, WineForm } from '../components';
 import { useWines, useToast } from '../contexts';
-import { extractWineFromImage } from '../utils';
+import { extractWineFromImage, enrichWineData } from '../utils';
 import { WineFormData, createDefaultWine } from '../types';
-import { Camera, Edit3, AlertCircle } from 'lucide-react';
+import { Camera, Edit3, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 
 type AddStep = 'choose' | 'photo' | 'validate' | 'manual';
 
@@ -15,9 +15,11 @@ export function AddWine() {
 
   const [step, setStep] = useState<AddStep>('choose');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
   const [extractedData, setExtractedData] = useState<Partial<WineFormData> | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [manualFormData, setManualFormData] = useState<Partial<WineFormData>>(createDefaultWine());
 
   const handleImageCapture = async (base64: string, mimeType: string) => {
     setImageBase64(base64);
@@ -26,11 +28,32 @@ export function AddWine() {
 
     try {
       const data = await extractWineFromImage(base64, mimeType);
-      setExtractedData({
-        ...data,
+
+      // Map extracted data to form fields, including new fields
+      const formData: Partial<WineFormData> = {
+        producer: data.producer,
+        wineName: data.wineName,
+        vintage: data.vintage,
+        region: data.region,
+        subRegion: data.subRegion,
+        country: data.country,
+        appellation: data.appellation,
+        varietals: data.varietals,
+        wineColor: data.wineColor,
+        alcoholContent: data.alcoholContent,
         labelImageBase64: base64,
-      });
+        // New fields from enhanced extraction
+        purchasePrice: data.estimatedPrice,
+        estimatedValue: data.estimatedPrice,
+        drinkingWindowStart: data.drinkingWindowStart,
+        drinkingWindowEnd: data.drinkingWindowEnd,
+        pairingSuggestions: data.pairingSuggestions || [],
+        story: data.story,
+      };
+
+      setExtractedData(formData);
       setStep('validate');
+      showToast('Wine label analyzed with tasting notes and recommendations!', 'success');
     } catch (err) {
       console.error('Error extracting wine data:', err);
       setError(err instanceof Error ? err.message : 'Failed to analyze wine label');
@@ -41,6 +64,53 @@ export function AddWine() {
       setStep('validate');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleEnrichManualEntry = async () => {
+    if (!manualFormData.producer && !manualFormData.wineName) {
+      showToast('Please enter at least a producer or wine name first', 'error');
+      return;
+    }
+
+    setIsEnriching(true);
+
+    try {
+      const enrichedData = await enrichWineData({
+        producer: manualFormData.producer,
+        wineName: manualFormData.wineName,
+        vintage: manualFormData.vintage,
+        region: manualFormData.region,
+        country: manualFormData.country,
+        varietals: manualFormData.varietals,
+      });
+
+      // Merge enriched data with existing form data, preferring user-entered values
+      setManualFormData(prev => ({
+        ...prev,
+        // Only fill in fields that are empty
+        region: prev.region || enrichedData.region,
+        subRegion: prev.subRegion || enrichedData.subRegion,
+        country: prev.country || enrichedData.country,
+        appellation: prev.appellation || enrichedData.appellation,
+        varietals: prev.varietals?.length ? prev.varietals : enrichedData.varietals,
+        wineColor: prev.wineColor || enrichedData.wineColor,
+        alcoholContent: prev.alcoholContent || enrichedData.alcoholContent,
+        // These fields are usually not entered manually, so we can fill them
+        purchasePrice: prev.purchasePrice || enrichedData.estimatedPrice,
+        estimatedValue: prev.estimatedValue || enrichedData.estimatedPrice,
+        drinkingWindowStart: prev.drinkingWindowStart || enrichedData.drinkingWindowStart,
+        drinkingWindowEnd: prev.drinkingWindowEnd || enrichedData.drinkingWindowEnd,
+        pairingSuggestions: prev.pairingSuggestions?.length ? prev.pairingSuggestions : (enrichedData.pairingSuggestions || []),
+        story: prev.story || enrichedData.story,
+      }));
+
+      showToast('Wine details enriched with tasting notes and recommendations!', 'success');
+    } catch (err) {
+      console.error('Error enriching wine data:', err);
+      showToast(err instanceof Error ? err.message : 'Failed to enrich wine data', 'error');
+    } finally {
+      setIsEnriching(false);
     }
   };
 
@@ -62,6 +132,7 @@ export function AddWine() {
       setExtractedData(null);
       setImageBase64(null);
       setError(null);
+      setManualFormData(createDefaultWine());
     }
   };
 
@@ -89,7 +160,7 @@ export function AddWine() {
             <div className="text-center">
               <h3 className="font-semibold text-charcoal-900 text-lg">Photo Capture</h3>
               <p className="text-sm text-charcoal-500 mt-1">
-                Take a photo of the label and let AI extract the details
+                Take a photo of the label and let AI extract details, tasting notes, and recommendations
               </p>
             </div>
           </button>
@@ -104,7 +175,7 @@ export function AddWine() {
             <div className="text-center">
               <h3 className="font-semibold text-charcoal-900 text-lg">Manual Entry</h3>
               <p className="text-sm text-charcoal-500 mt-1">
-                Enter wine details manually using the form
+                Enter wine name and let AI fill in tasting notes, drinking window, and pairings
               </p>
             </div>
           </button>
@@ -166,6 +237,11 @@ export function AddWine() {
                   <p className="text-sm text-charcoal-500">
                     Review and adjust the extracted details below
                   </p>
+                {extractedData?.story && (
+                    <p className="text-sm text-green-600 mt-1">
+                      ✓ Tasting notes and recommendations included
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -182,10 +258,43 @@ export function AddWine() {
 
       {step === 'manual' && (
         <div className="bg-white rounded-xl border border-charcoal-100 overflow-hidden">
+          <div className="px-6 pt-6">
+            <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-wine-50 to-gold-50 border border-wine-100 rounded-lg">
+              <Sparkles className="w-5 h-5 text-wine-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-charcoal-800">
+                  AI-Powered Wine Details
+                </p>
+                <p className="text-sm text-charcoal-600 mt-1">
+                  Enter the producer and wine name, then click the button below to auto-fill tasting notes, drinking window, food pairings, and more.
+                </p>
+                <button
+                  onClick={handleEnrichManualEntry}
+                  disabled={isEnriching || (!manualFormData.producer && !manualFormData.wineName)}
+                  className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-wine-900 hover:bg-wine-800 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isEnriching ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Analyzing wine...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Fill in Details with AI
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <WineForm
+            initialData={manualFormData}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             submitLabel="Add to Collection"
+            onFormChange={setManualFormData}
           />
         </div>
       )}

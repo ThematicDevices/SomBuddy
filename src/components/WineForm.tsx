@@ -8,6 +8,7 @@ interface WineFormProps {
   onCancel: () => void;
   submitLabel?: string;
   isLoading?: boolean;
+  onFormChange?: (data: Partial<WineFormData>) => void;
 }
 
 export function WineForm({
@@ -15,19 +16,37 @@ export function WineForm({
   onSubmit,
   onCancel,
   submitLabel = 'Add Wine',
-  isLoading = false
+  isLoading = false,
+  onFormChange
 }: WineFormProps) {
   const [formData, setFormData] = useState<WineFormData>({
     ...createDefaultWine(),
     ...initialData,
   });
 
+  // Sync form data with initialData when it changes (for enrichment)
+  React.useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({
+        ...prev,
+        ...initialData,
+      }));
+    }
+  }, [initialData]);
+
   const [newVarietal, setNewVarietal] = useState('');
   const [newPairing, setNewPairing] = useState('');
   const [showVarietalSuggestions, setShowVarietalSuggestions] = useState(false);
 
   const updateField = <K extends keyof WineFormData>(field: K, value: WineFormData[K]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      // Notify parent of form changes
+      if (onFormChange) {
+        onFormChange(newData);
+      }
+      return newData;
+    });
   };
 
   const addVarietal = () => {
