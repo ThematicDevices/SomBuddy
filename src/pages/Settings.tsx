@@ -1,251 +1,236 @@
-import React, { useState, useRef } from 'react';
-import { useApiKey, useWines, useToast } from '../contexts';
-import { storage } from '../utils';
-import { Key, Download, Upload, Trash2, Database, AlertTriangle } from 'lucide-react';
-import { Modal } from '../components';
+import React, { useState } from 'react';
+import { useAuth, useToast } from '../contexts';
+import { User, Mail, LogOut, Trash2, Download, Upload, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export function Settings() {
-  const { apiKey, setApiKey, clearApiKey, isConfigured } = useApiKey();
-  const { wines, refreshWines } = useWines();
+  const { user, profile, signOut, updateProfile } = useAuth();
   const { showToast } = useToast();
 
-  const [newApiKey, setNewApiKey] = useState('');
-  const [showClearDataModal, setShowClearDataModal] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fullName, setFullName] = useState(profile?.full_name || '');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleSaveApiKey = () => {
-    if (newApiKey.trim()) {
-      setApiKey(newApiKey.trim());
-      setNewApiKey('');
-      showToast('API key saved successfully', 'success');
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdating(true);
+
+    const { error } = await updateProfile({ full_name: fullName });
+
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast('Profile updated successfully', 'success');
     }
+
+    setIsUpdating(false);
   };
 
-  const handleClearApiKey = () => {
-    clearApiKey();
-    showToast('API key removed', 'info');
+  const handleExportData = async () => {
+    setIsExporting(true);
+
+    try {
+      const { data: wines } = await supabase
+        .from('wines')
+        .select('*')
+        .eq('user_id', user?.id);
+
+      const exportData = {
+        wines: wines || [],
+        exportDate: new Date().toISOString(),
+        version: '2.0',
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sommelier-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('Data exported successfully', 'success');
+    } catch (error) {
+      showToast('Failed to export data', 'error');
+    }
+
+    setIsExporting(false);
   };
 
-  const handleExport = () => {
-    const data = storage.exportData();
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sommelier-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('Collection exported successfully', 'success');
-  };
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      const result = storage.importData(content);
-      if (result.success) {
-        refreshWines();
-        showToast(result.message, 'success');
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (data.wines && Array.isArray(data.wines)) {
+        let imported = 0;
+        for (const wine of data.wines) {
+          const { error } = await supabase.from('wines').insert({
+            user_id: user.id,
+            producer: wine.producer || wine.producer,
+            wine_name: wine.wine_name || wine.wineName || '',
+            vintage: wine.vintage,
+            region: wine.region || '',
+            country: wine.country || '',
+            varietals: wine.varietals || [],
+            wine_color: wine.wine_color || wine.wineColor || 'red',
+            quantity: wine.quantity || 1,
+            pairing_suggestions: wine.pairing_suggestions || wine.pairingSuggestions || [],
+          });
+
+          if (!error) imported++;
+        }
+
+        showToast(`Imported ${imported} wines successfully`, 'success');
+        window.location.reload();
       } else {
-        showToast(result.message, 'error');
+        showToast('Invalid import file format', 'error');
       }
-    };
-    reader.readAsText(file);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    } catch (error) {
+      showToast('Failed to import data', 'error');
     }
+
+    e.target.value = '';
   };
 
-  const handleClearAllData = () => {
-    localStorage.clear();
-    refreshWines();
-    setShowClearDataModal(false);
-    showToast('All data cleared', 'info');
-    window.location.reload();
+  const handleSignOut = async () => {
+    await signOut();
+    showToast('Signed out successfully', 'info');
   };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-display font-bold text-charcoal-900">Settings</h1>
-        <p className="text-charcoal-500">Manage your API key and collection data</p>
+        <p className="text-charcoal-500">Manage your account and preferences</p>
       </div>
 
+      {/* Account Info */}
       <div className="bg-white rounded-xl border border-charcoal-100 overflow-hidden">
-        <div className="p-6 border-b border-charcoal-100">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-wine-50 rounded-lg flex items-center justify-center">
-              <Key className="w-5 h-5 text-wine-700" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-charcoal-900">Claude API Key</h2>
-              <p className="text-sm text-charcoal-500">
-                Required for photo recognition and sommelier features
-              </p>
-            </div>
-          </div>
-
-          {isConfigured ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                <span className="text-sm text-green-800 font-medium">API key configured</span>
-                <span className="text-xs text-green-600 ml-auto">
-                  ••••••••{apiKey?.slice(-8)}
-                </span>
-              </div>
-              <button
-                onClick={handleClearApiKey}
-                className="text-sm text-red-600 hover:text-red-700 font-medium"
-              >
-                Remove API key
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-charcoal-700 mb-1">
-                  Enter your Claude API Key
-                </label>
-                <input
-                  type="password"
-                  value={newApiKey}
-                  onChange={e => setNewApiKey(e.target.value)}
-                  placeholder="sk-ant-api03-..."
-                  className="w-full px-3 py-2 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
-                />
-              </div>
-              <p className="text-xs text-charcoal-500">
-                Get your API key from{' '}
-                <a
-                  href="https://console.anthropic.com/settings/keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-wine-700 hover:underline"
-                >
-                  console.anthropic.com
-                </a>
-              </p>
-              <button
-                onClick={handleSaveApiKey}
-                disabled={!newApiKey.trim()}
-                className="px-4 py-2 bg-wine-900 text-white rounded-lg hover:bg-wine-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
-              >
-                Save API Key
-              </button>
-            </div>
-          )}
+        <div className="px-6 py-4 border-b border-charcoal-100">
+          <h2 className="font-semibold text-charcoal-900 flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Account
+          </h2>
         </div>
-
-        <div className="p-6 border-b border-charcoal-100">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-charcoal-100 rounded-lg flex items-center justify-center">
-              <Database className="w-5 h-5 text-charcoal-600" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-charcoal-900">Collection Data</h2>
-              <p className="text-sm text-charcoal-500">
-                {wines.length} wines in your collection
-              </p>
+        <form onSubmit={handleUpdateProfile} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              Email
+            </label>
+            <div className="flex items-center gap-2 px-4 py-3 bg-charcoal-50 rounded-xl text-charcoal-600">
+              <Mail className="w-4 h-4" />
+              {user?.email}
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleExport}
-              disabled={wines.length === 0}
-              className="flex items-center gap-2 px-4 py-2 border border-charcoal-200 text-charcoal-700 rounded-lg hover:bg-charcoal-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Export Collection
-            </button>
-
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 border border-charcoal-200 text-charcoal-700 rounded-lg hover:bg-charcoal-50 transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              Import Collection
-            </button>
-
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              Full Name
+            </label>
             <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleImport}
-              className="hidden"
+              type="text"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              className="w-full px-4 py-3 border border-charcoal-200 rounded-xl focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
+              placeholder="Your name"
             />
-          </div>
-        </div>
-
-        <div className="p-6 bg-red-50">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <Trash2 className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
-              <p className="text-sm text-red-700">
-                Permanently delete all your data
-              </p>
-            </div>
           </div>
 
           <button
-            onClick={() => setShowClearDataModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            type="submit"
+            disabled={isUpdating}
+            className="px-6 py-2 bg-wine-900 text-white rounded-lg hover:bg-wine-800 disabled:opacity-50 font-medium transition-colors flex items-center gap-2"
           >
-            <Trash2 className="w-4 h-4" />
-            Clear All Data
+            {isUpdating && <Loader2 className="w-4 h-4 animate-spin" />}
+            Update Profile
+          </button>
+        </form>
+      </div>
+
+      {/* Data Management */}
+      <div className="bg-white rounded-xl border border-charcoal-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-charcoal-100">
+          <h2 className="font-semibold text-charcoal-900 flex items-center gap-2">
+            <Download className="w-5 h-5" />
+            Data Management
+          </h2>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handleExportData}
+              disabled={isExporting}
+              className="flex items-center justify-center gap-2 px-4 py-2 border border-charcoal-200 text-charcoal-700 rounded-lg hover:bg-charcoal-50 transition-colors font-medium"
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export Collection
+            </button>
+
+            <label className="flex items-center justify-center gap-2 px-4 py-2 border border-charcoal-200 text-charcoal-700 rounded-lg hover:bg-charcoal-50 transition-colors font-medium cursor-pointer">
+              <Upload className="w-4 h-4" />
+              Import Collection
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportData}
+                className="hidden"
+              />
+            </label>
+          </div>
+          <p className="text-xs text-charcoal-500">
+            Export your wine collection as JSON for backup or import data from a previous export.
+          </p>
+        </div>
+      </div>
+
+      {/* Sign Out */}
+      <div className="bg-white rounded-xl border border-charcoal-100 overflow-hidden">
+        <div className="p-6 space-y-4">
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors font-medium"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
           </button>
         </div>
       </div>
 
-      <div className="bg-charcoal-50 rounded-xl p-6 text-center">
-        <p className="text-sm text-charcoal-500">
-          Sommelier - Your Personal Wine Catalog
-        </p>
-        <p className="text-xs text-charcoal-400 mt-1">
-          All data is stored locally in your browser
-        </p>
-      </div>
-
-      <Modal
-        isOpen={showClearDataModal}
-        onClose={() => setShowClearDataModal(false)}
-        title="Clear All Data"
-        size="sm"
-      >
-        <div className="p-6">
-          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
-            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-            <p className="text-sm text-red-800">
-              This will permanently delete all your wines, tasting notes, and chat history.
-              This action cannot be undone.
-            </p>
-          </div>
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setShowClearDataModal(false)}
-              className="px-4 py-2 text-charcoal-600 hover:text-charcoal-800 font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleClearAllData}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
-            >
-              Delete Everything
-            </button>
-          </div>
+      {/* Danger Zone */}
+      <div className="bg-white rounded-xl border border-red-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-red-200 bg-red-50">
+          <h2 className="font-semibold text-red-900 flex items-center gap-2">
+            <Trash2 className="w-5 h-5" />
+            Danger Zone
+          </h2>
         </div>
-      </Modal>
+        <div className="p-6">
+          <p className="text-sm text-charcoal-600 mb-4">
+            Permanently delete your account and all associated data. This action cannot be undone.
+          </p>
+          <button
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+            onClick={() => {
+              if (confirm('Are you sure you want to delete your account? This cannot be undone.')) {
+                showToast('Please contact support to delete your account', 'info');
+              }
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Account
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

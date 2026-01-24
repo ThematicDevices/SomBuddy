@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { WineProvider, ApiKeyProvider, ToastProvider } from './contexts';
-import { Layout } from './components';
+import { WineProvider, AuthProvider, ToastProvider } from './contexts';
+import { Layout, ProtectedRoute } from './components';
 import {
   Dashboard,
   Collection,
@@ -9,17 +9,33 @@ import {
   WineDetail,
   Sommelier,
   Settings,
-  Search
+  Search,
+  Login,
+  Signup,
+  ForgotPassword
 } from './pages';
 
 function App() {
   return (
     <ToastProvider>
-      <ApiKeyProvider>
+      <AuthProvider>
         <WineProvider>
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Layout />}>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+
+              {/* Protected routes */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
                 <Route index element={<Dashboard />} />
                 <Route path="collection" element={<Collection />} />
                 <Route path="add" element={<AddWine />} />
@@ -31,7 +47,7 @@ function App() {
             </Routes>
           </BrowserRouter>
         </WineProvider>
-      </ApiKeyProvider>
+      </AuthProvider>
     </ToastProvider>
   );
 }

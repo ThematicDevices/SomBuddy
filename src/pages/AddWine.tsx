@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ImageUpload, WineForm, Modal } from '../components';
-import { useWines, useApiKey, useToast } from '../contexts';
+import { ImageUpload, WineForm } from '../components';
+import { useWines, useToast } from '../contexts';
 import { extractWineFromImage } from '../utils';
 import { WineFormData, createDefaultWine } from '../types';
-import { Camera, Edit3, AlertCircle, Key } from 'lucide-react';
+import { Camera, Edit3, AlertCircle } from 'lucide-react';
 
 type AddStep = 'choose' | 'photo' | 'validate' | 'manual';
 
 export function AddWine() {
   const navigate = useNavigate();
   const { addWine } = useWines();
-  const { apiKey, setApiKey, isConfigured } = useApiKey();
   const { showToast } = useToast();
 
   const [step, setStep] = useState<AddStep>('choose');
@@ -19,21 +18,14 @@ export function AddWine() {
   const [extractedData, setExtractedData] = useState<Partial<WineFormData> | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState('');
 
   const handleImageCapture = async (base64: string, mimeType: string) => {
-    if (!apiKey) {
-      setShowApiKeyModal(true);
-      return;
-    }
-
     setImageBase64(base64);
     setIsProcessing(true);
     setError(null);
 
     try {
-      const data = await extractWineFromImage(apiKey, base64, mimeType);
+      const data = await extractWineFromImage(base64, mimeType);
       setExtractedData({
         ...data,
         labelImageBase64: base64,
@@ -52,18 +44,14 @@ export function AddWine() {
     }
   };
 
-  const handleSaveApiKey = () => {
-    if (tempApiKey.trim()) {
-      setApiKey(tempApiKey.trim());
-      setShowApiKeyModal(false);
-      showToast('API key saved successfully', 'success');
+  const handleSubmit = async (data: WineFormData) => {
+    try {
+      const wine = await addWine(data);
+      showToast(`${wine.producer} ${wine.wineName || ''} added to your collection!`, 'success');
+      navigate(`/wine/${wine.id}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to add wine', 'error');
     }
-  };
-
-  const handleSubmit = (data: WineFormData) => {
-    const wine = addWine(data);
-    showToast(`${wine.producer} ${wine.wineName || ''} added to your collection!`, 'success');
-    navigate(`/wine/${wine.id}`);
   };
 
   const handleCancel = () => {
@@ -92,13 +80,7 @@ export function AddWine() {
       {step === 'choose' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button
-            onClick={() => {
-              if (!isConfigured) {
-                setShowApiKeyModal(true);
-              } else {
-                setStep('photo');
-              }
-            }}
+            onClick={() => setStep('photo')}
             className="flex flex-col items-center gap-4 p-8 bg-white rounded-xl border-2 border-charcoal-100 hover:border-wine-300 hover:bg-wine-50/30 transition-all group"
           >
             <div className="w-16 h-16 bg-wine-100 rounded-full flex items-center justify-center group-hover:bg-wine-200 transition-colors">
@@ -110,12 +92,6 @@ export function AddWine() {
                 Take a photo of the label and let AI extract the details
               </p>
             </div>
-            {!isConfigured && (
-              <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
-                <Key className="w-3 h-3" />
-                API key required
-              </span>
-            )}
           </button>
 
           <button
@@ -213,61 +189,6 @@ export function AddWine() {
           />
         </div>
       )}
-
-      <Modal
-        isOpen={showApiKeyModal}
-        onClose={() => setShowApiKeyModal(false)}
-        title="Configure Claude API Key"
-        size="md"
-      >
-        <div className="p-6 space-y-4">
-          <p className="text-charcoal-600">
-            To use photo-based wine entry, you need to provide your Claude API key.
-            This key is stored locally in your browser and is never sent to any server except Anthropic's API.
-          </p>
-
-          <div>
-            <label className="block text-sm font-medium text-charcoal-700 mb-1">
-              Claude API Key
-            </label>
-            <input
-              type="password"
-              value={tempApiKey}
-              onChange={e => setTempApiKey(e.target.value)}
-              placeholder="sk-ant-api03-..."
-              className="w-full px-3 py-2 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
-            />
-          </div>
-
-          <p className="text-xs text-charcoal-500">
-            Get your API key from{' '}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-wine-700 hover:underline"
-            >
-              console.anthropic.com
-            </a>
-          </p>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              onClick={() => setShowApiKeyModal(false)}
-              className="px-4 py-2 text-charcoal-600 hover:text-charcoal-800 font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveApiKey}
-              disabled={!tempApiKey.trim()}
-              className="px-4 py-2 bg-wine-900 text-white rounded-lg hover:bg-wine-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
-            >
-              Save API Key
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

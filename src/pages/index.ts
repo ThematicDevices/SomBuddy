@@ -5,3 +5,6 @@ export { WineDetail } from './WineDetail';
 export { Sommelier } from './Sommelier';
 export { Settings } from './Settings';
 export { Search } from './Search';
+export { Login } from './Login';
+export { Signup } from './Signup';
+export { ForgotPassword } from './ForgotPassword';
