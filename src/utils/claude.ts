@@ -1,5 +1,4 @@
 import { Wine, WineColor, VarietalBlend } from '../types';
-import { supabase } from '../lib/supabase';
 
 interface ExtractedWineData {
   producer: string;
@@ -13,21 +12,31 @@ interface ExtractedWineData {
   alcoholContent?: number;
 }
 
+// Use relative URL for Vercel serverless function
+const CLAUDE_PROXY_URL = '/api/claude-proxy';
+
 export async function extractWineFromImage(
   imageBase64: string,
   mimeType: string
 ): Promise<ExtractedWineData> {
-  const { data, error } = await supabase.functions.invoke('claude-proxy', {
-    body: {
+  const response = await fetch(CLAUDE_PROXY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
       action: 'extract-wine',
       imageBase64,
       mimeType,
-    },
+    }),
   });
 
-  if (error) {
-    throw new Error(error.message);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Request failed with status ${response.status}`);
   }
+
+  const data = await response.json();
 
   if (data.error) {
     throw new Error(data.error);
@@ -65,18 +74,25 @@ export async function getSommelierRecommendation(
   wines: Wine[],
   conversationHistory: Array<{ role: string; content: string }>
 ): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('claude-proxy', {
-    body: {
+  const response = await fetch(CLAUDE_PROXY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
       action: 'sommelier-chat',
       userQuery,
       wines,
       conversationHistory,
-    },
+    }),
   });
 
-  if (error) {
-    throw new Error(error.message);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Request failed with status ${response.status}`);
   }
+
+  const data = await response.json();
 
   if (data.error) {
     throw new Error(data.error);
