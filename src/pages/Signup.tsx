@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth, useToast } from '../contexts';
-import { Wine, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Wine, Loader2, Eye, EyeOff, Mail, CheckCircle } from 'lucide-react';
 
 export function Signup() {
-  const navigate = useNavigate();
   const { signUp } = useAuth();
   const { showToast } = useToast();
 
@@ -14,6 +13,7 @@ export function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,10 +36,61 @@ export function Signup() {
       showToast(error.message, 'error');
       setIsLoading(false);
     } else {
-      showToast('Account created! Please check your email to verify.', 'success');
-      navigate('/login');
+      setIsLoading(false);
+      setIsSuccess(true);
     }
   };
+
+  // Show success screen after account creation
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen bg-charcoal-50 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
+            <CheckCircle className="w-10 h-10 text-green-600" />
+          </div>
+
+          <h1 className="text-2xl font-display font-bold text-charcoal-900 mb-2">
+            Check Your Email
+          </h1>
+
+          <p className="text-charcoal-600 mb-6">
+            We've sent a verification link to:
+          </p>
+
+          <div className="bg-white rounded-xl border border-charcoal-200 px-4 py-3 mb-6 inline-flex items-center gap-2">
+            <Mail className="w-5 h-5 text-charcoal-400" />
+            <span className="font-medium text-charcoal-900">{email}</span>
+          </div>
+
+          <p className="text-charcoal-500 text-sm mb-8">
+            Click the link in the email to verify your account.
+            Once verified, you can sign in and start building your wine collection.
+          </p>
+
+          <div className="space-y-3">
+            <Link
+              to="/login"
+              className="block w-full py-3 bg-wine-900 text-white rounded-xl hover:bg-wine-800 font-medium transition-colors text-center"
+            >
+              Go to Sign In
+            </Link>
+
+            <button
+              onClick={() => setIsSuccess(false)}
+              className="block w-full py-3 bg-charcoal-100 text-charcoal-700 rounded-xl hover:bg-charcoal-200 font-medium transition-colors"
+            >
+              Use a Different Email
+            </button>
+          </div>
+
+          <p className="text-charcoal-400 text-sm mt-6">
+            Didn't receive the email? Check your spam folder or try signing up again.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-charcoal-50 flex flex-col items-center justify-center p-4">
