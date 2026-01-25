@@ -12,7 +12,8 @@ import {
   Search,
   Login,
   Signup,
-  ForgotPassword
+  ForgotPassword,
+  RestaurantAdvisor
 } from './pages';
 
 function App() {
@@ -41,6 +42,7 @@ function App() {
                 <Route path="add" element={<AddWine />} />
                 <Route path="wine/:id" element={<WineDetail />} />
                 <Route path="sommelier" element={<Sommelier />} />
+                <Route path="restaurant" element={<RestaurantAdvisor />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="search" element={<Search />} />
               </Route>

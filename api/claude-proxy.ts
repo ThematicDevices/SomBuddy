@@ -4,7 +4,7 @@ const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 
 interface RequestBody {
-  action: 'extract-wine' | 'enrich-wine' | 'sommelier-chat';
+  action: 'extract-wine' | 'enrich-wine' | 'sommelier-chat' | 'restaurant-advisor';
   imageBase64?: string;
   mimeType?: string;
   userQuery?: string;
@@ -31,6 +31,12 @@ interface RequestBody {
     quantity?: number;
   }>;
   conversationHistory?: Array<{ role: string; content: string }>;
+  restaurantName?: string;
+  corkageFee?: number;
+  wineListImage?: string;
+  wineListMimeType?: string;
+  wineListText?: string;
+  mealDescription?: string;
 }
 
 const WINE_EXTRACTION_SCHEMA = `{
@@ -203,6 +209,104 @@ IMPORTANT:
           content: userQuery,
         },
       ];
+    } else if (action === 'restaurant-advisor') {
+      const { restaurantName, corkageFee, wineListImage, wineListMimeType, wineListText, mealDescription } = req.body as RequestBody;
+      const currentYear = new Date().getFullYear();
+
+      const winesSummary = (wines || []).map((w) => {
+        const drinkingInfo = w.drinkingWindowStart && w.drinkingWindowEnd
+          ? `drinking window: ${w.drinkingWindowStart}-${w.drinkingWindowEnd}`
+          : `status: ${w.drinkingStatus || 'unknown'}`;
+        const varietalStr = (w.varietals || []).map((v) => v.varietal).join(', ');
+        const priceInfo = w.purchasePrice ? `$${w.purchasePrice}` : 'price unknown';
+        return `- ID:${w.id} | ${w.vintage || 'NV'} ${w.producer} ${w.wineName} | ${varietalStr} | ${w.region}, ${w.country} | ${priceInfo} | ${drinkingInfo} | qty: ${w.quantity || 1}`;
+      }).join('\n');
+
+      systemPrompt = `You are an expert sommelier helping a wine enthusiast decide whether to bring wine from their personal collection to a restaurant (and pay corkage) or buy wine at the restaurant.
+
+CURRENT YEAR: ${currentYear}
+RESTAURANT: ${restaurantName || 'Unknown Restaurant'}
+CORKAGE FEE: $${corkageFee || 0}
+${mealDescription ? `PLANNED MEAL: ${mealDescription}` : ''}
+
+THE GUEST'S WINE COLLECTION:
+${winesSummary || 'The collection is currently empty.'}
+
+TASK:
+1. Parse all wines from the restaurant's wine list with their prices
+2. For each wine category (reds, whites, etc.), compare restaurant options to the guest's collection
+3. Calculate value: (Restaurant wine price) vs (Collection wine value + corkage fee)
+4. Consider quality: Is the collection wine of similar/better/lesser quality?
+5. Consider pairing: How well does each option pair with the planned meal (if specified)?
+6. Provide clear recommendations
+
+Return valid JSON in this exact format:
+{
+  "restaurantName": "Restaurant Name",
+  "corkageFee": 35,
+  "mealDescription": "What they plan to eat",
+  "recommendations": [
+    {
+      "recommendation": "bring|buy",
+      "restaurantWineName": "Wine name on restaurant list",
+      "restaurantWineVintage": 2020,
+      "restaurantWineProducer": "Producer",
+      "restaurantWineVarietal": "Grape variety",
+      "restaurantWinePrice": 85,
+      "restaurantWineRegion": "Region",
+      "collectionWineId": "id-from-collection-or-null",
+      "collectionWineValue": 45,
+      "corkageFee": 35,
+      "totalBringCost": 80,
+      "savings": 5,
+      "qualityComparison": "better|similar|lesser",
+      "pairingScore": 8,
+      "reasoning": "Explanation of recommendation"
+    }
+  ],
+  "summary": "Overall strategy summary - what to bring vs buy and why"
+}
+
+GUIDELINES:
+- Only recommend bringing wines the guest actually owns (from their collection)
+- Calculate savings accurately: savings = restaurantPrice - (collectionWineValue + corkageFee)
+- If savings are negative, recommend buying at restaurant unless quality is significantly better
+- Pairing score is 1-10 where 10 is perfect pairing
+- Consider the dining experience holistically - sometimes buying at restaurant is worth it
+- If no good matches exist in collection, recommend buying
+- Limit to top 5-8 most relevant recommendations`;
+
+      // Build the message content based on whether image or text was provided
+      if (wineListImage && wineListMimeType) {
+        messages = [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: wineListMimeType,
+                  data: wineListImage,
+                },
+              },
+              {
+                type: 'text',
+                text: `This is the wine list from ${restaurantName || 'a restaurant'}. Please analyze it and compare with my collection to provide recommendations on what to bring vs. buy. Return the analysis as JSON.`,
+              },
+            ],
+          },
+        ];
+      } else if (wineListText) {
+        messages = [
+          {
+            role: 'user',
+            content: `Here is the wine list from ${restaurantName || 'a restaurant'}:\n\n${wineListText}\n\nPlease analyze it and compare with my collection to provide recommendations on what to bring vs. buy. Return the analysis as JSON.`,
+          },
+        ];
+      } else {
+        throw new Error('Wine list image or text is required');
+      }
     } else {
       throw new Error('Invalid action');
     }

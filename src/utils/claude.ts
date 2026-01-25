@@ -1,4 +1,4 @@
-import { Wine, WineColor, VarietalBlend } from '../types';
+import { Wine, WineColor, VarietalBlend, RestaurantAnalysis } from '../types';
 
 // Separate interface for AI-extracted tasting profile (not the same as user TastingNote)
 interface AITastingProfile {
@@ -197,4 +197,96 @@ export async function getSommelierRecommendation(
   }
 
   return data.result;
+}
+
+function parseRestaurantResponse(jsonString: string): RestaurantAnalysis {
+  const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('Could not parse restaurant analysis from response');
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    throw new Error(`Invalid JSON response: ${e instanceof Error ? e.message : 'Unknown parsing error'}`);
+  }
+
+  const recommendations = Array.isArray(parsed.recommendations)
+    ? parsed.recommendations.map((rec: Record<string, unknown>) => ({
+        recommendation: rec.recommendation === 'bring' ? 'bring' : 'buy',
+        restaurantWine: {
+          name: typeof rec.restaurantWineName === 'string' ? rec.restaurantWineName : 'Unknown Wine',
+          vintage: rec.restaurantWineVintage ? parseInt(String(rec.restaurantWineVintage), 10) : undefined,
+          producer: typeof rec.restaurantWineProducer === 'string' ? rec.restaurantWineProducer : undefined,
+          varietal: typeof rec.restaurantWineVarietal === 'string' ? rec.restaurantWineVarietal : undefined,
+          price: rec.restaurantWinePrice ? parseFloat(String(rec.restaurantWinePrice)) : 0,
+          region: typeof rec.restaurantWineRegion === 'string' ? rec.restaurantWineRegion : undefined,
+        },
+        collectionWine: rec.collectionWineId ? { id: rec.collectionWineId } : undefined,
+        collectionWineValue: rec.collectionWineValue ? parseFloat(String(rec.collectionWineValue)) : 0,
+        corkageFee: rec.corkageFee ? parseFloat(String(rec.corkageFee)) : 0,
+        totalBringCost: rec.totalBringCost ? parseFloat(String(rec.totalBringCost)) : 0,
+        restaurantPrice: rec.restaurantWinePrice ? parseFloat(String(rec.restaurantWinePrice)) : 0,
+        savings: rec.savings ? parseFloat(String(rec.savings)) : 0,
+        qualityComparison: ['better', 'similar', 'lesser'].includes(String(rec.qualityComparison))
+          ? rec.qualityComparison as 'better' | 'similar' | 'lesser'
+          : 'similar',
+        pairingScore: rec.pairingScore ? parseInt(String(rec.pairingScore), 10) : 5,
+        reasoning: typeof rec.reasoning === 'string' ? rec.reasoning : '',
+      }))
+    : [];
+
+  return {
+    restaurantName: typeof parsed.restaurantName === 'string' ? parsed.restaurantName : '',
+    corkageFee: parsed.corkageFee ? parseFloat(String(parsed.corkageFee)) : 0,
+    mealDescription: typeof parsed.mealDescription === 'string' ? parsed.mealDescription : undefined,
+    recommendations,
+    summary: typeof parsed.summary === 'string' ? parsed.summary : '',
+    bringFromCellarCount: recommendations.filter(r => r.recommendation === 'bring').length,
+    buyAtRestaurantCount: recommendations.filter(r => r.recommendation === 'buy').length,
+    totalPotentialSavings: recommendations
+      .filter(r => r.recommendation === 'bring')
+      .reduce((sum, r) => sum + r.savings, 0),
+  };
+}
+
+export async function getRestaurantRecommendation(
+  restaurantName: string,
+  corkageFee: number,
+  wines: Wine[],
+  wineListImage?: string,
+  wineListMimeType?: string,
+  wineListText?: string,
+  mealDescription?: string
+): Promise<RestaurantAnalysis> {
+  const response = await fetch(CLAUDE_PROXY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'restaurant-advisor',
+      restaurantName,
+      corkageFee,
+      wines,
+      wineListImage,
+      wineListMimeType,
+      wineListText,
+      mealDescription,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  return parseRestaurantResponse(data.result);
 }

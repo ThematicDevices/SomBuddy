@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Wine, Home, MessageCircle, PlusCircle, Settings, Search, User } from 'lucide-react';
+import { Wine, Home, MessageCircle, PlusCircle, Settings, Search, User, UtensilsCrossed } from 'lucide-react';
 import { ToastContainer } from './Toast';
 import { useAuth } from '../contexts';
 
@@ -12,7 +12,7 @@ export function Layout() {
     { to: '/collection', icon: Wine, label: 'Collection' },
     { to: '/add', icon: PlusCircle, label: 'Add' },
     { to: '/sommelier', icon: MessageCircle, label: 'Sommelier' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
+    { to: '/restaurant', icon: UtensilsCrossed, label: 'Restaurant' },
   ];
 
   return (

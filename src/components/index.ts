@@ -5,3 +5,5 @@ export { WineCard } from './WineCard';
 export { WineForm } from './WineForm';
 export { ImageUpload } from './ImageUpload';
 export { ProtectedRoute } from './ProtectedRoute';
+export { WineListInput } from './WineListInput';
+export { RecommendationCard } from './RecommendationCard';
