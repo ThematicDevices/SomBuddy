@@ -86,7 +86,7 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
   const [wines, setWines] = useState<Wine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshWines = useCallback(async () => {
+  const fetchWines = useCallback(async (signal?: { aborted: boolean }) => {
     if (!user) {
       setWines([]);
       setIsLoading(false);
@@ -94,23 +94,43 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('wines')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('wines')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      // Check if the request was aborted before updating state
+      if (signal?.aborted) return;
+
+      if (error) {
+        console.error('Error fetching wines:', error);
+      } else {
+        setWines((data || []).map(dbRowToWine));
+      }
+    } catch (error) {
+      // Ignore abort errors (caused by React StrictMode double-mounting)
+      if (error instanceof Error && error.name === 'AbortError') return;
       console.error('Error fetching wines:', error);
-    } else {
-      setWines((data || []).map(dbRowToWine));
     }
-    setIsLoading(false);
+    if (!signal?.aborted) {
+      setIsLoading(false);
+    }
   }, [user]);
 
+  // Public method without signal parameter
+  const refreshWines = useCallback(async () => {
+    return fetchWines();
+  }, [fetchWines]);
+
   useEffect(() => {
-    refreshWines();
-  }, [refreshWines]);
+    const signal = { aborted: false };
+    fetchWines(signal);
+    return () => {
+      signal.aborted = true;
+    };
+  }, [fetchWines]);
 
   const addWine = useCallback(async (formData: WineFormData): Promise<Wine> => {
     if (!user) throw new Error('Must be logged in to add wine');

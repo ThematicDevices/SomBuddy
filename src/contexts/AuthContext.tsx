@@ -44,23 +44,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile);
+        fetchProfile(session.user.id).then((profile) => {
+          if (isMounted) setProfile(profile);
+        });
       }
       setIsLoading(false);
+    }).catch((error) => {
+      // Ignore abort errors (caused by React StrictMode double-mounting)
+      if (error?.name === 'AbortError') return;
+      console.error('Session error:', error);
+      if (isMounted) setIsLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return;
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
-          setProfile(profile);
+          if (isMounted) setProfile(profile);
         } else {
           setProfile(null);
         }
@@ -71,7 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
