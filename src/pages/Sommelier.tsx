@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useWines, useToast } from '../contexts';
 import { getSommelierRecommendation } from '../utils';
 import { ChatMessage } from '../types';
 import { Send, Wine, Loader2, Trash2, User, Bot } from 'lucide-react';
+
+const MAX_MESSAGES = 100;
 
 export function Sommelier() {
   const { wines } = useWines();
@@ -14,13 +16,13 @@ export function Sommelier() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -73,7 +75,13 @@ export function Sommelier() {
         timestamp: new Date().toISOString(),
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages(prev => {
+        const newMessages = [...prev, assistantMessage];
+        if (newMessages.length > MAX_MESSAGES) {
+          return newMessages.slice(-MAX_MESSAGES);
+        }
+        return newMessages;
+      });
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : 'Failed to get response',

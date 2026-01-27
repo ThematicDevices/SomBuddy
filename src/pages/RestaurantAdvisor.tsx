@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useWines, useToast } from '../contexts';
 import { getRestaurantRecommendation } from '../utils';
 import { WineListInput, RecommendationCard } from '../components';
-import { RestaurantAnalysis, Wine } from '../types';
+import { RestaurantAnalysis, Wine, WineComparison } from '../types';
 import {
   UtensilsCrossed,
   Loader2,
@@ -75,9 +75,10 @@ export function RestaurantAdvisor() {
     setError(null);
   };
 
-  const getCollectionWineName = (comparison: RestaurantAnalysis['recommendations'][0]): string | undefined => {
-    if (!comparison.collectionWine?.id) return undefined;
-    const wine = wines.find((w: Wine) => w.id === comparison.collectionWine?.id);
+  const getCollectionWineName = (comparison: WineComparison): string | undefined => {
+    const collectionWineId = comparison.collectionWine?.id;
+    if (!collectionWineId) return undefined;
+    const wine = wines.find((w: Wine) => w.id === collectionWineId);
     return wine ? getWineDisplayName(wine) : undefined;
   };
 

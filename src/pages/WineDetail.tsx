@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useWines, useToast } from '../contexts';
 import { Modal, WineForm } from '../components';
@@ -68,23 +68,31 @@ export function WineDetail() {
 
   const drinkingStatus = calculateDrinkingStatus(wine);
 
-  const handleEdit = (data: WineFormData) => {
-    updateWine({
-      ...wine,
-      ...data,
-      dateModified: new Date().toISOString(),
-    });
-    setShowEditModal(false);
-    showToast('Wine updated successfully', 'success');
+  const handleEdit = async (data: WineFormData) => {
+    try {
+      await updateWine({
+        ...wine,
+        ...data,
+        dateModified: new Date().toISOString(),
+      });
+      setShowEditModal(false);
+      showToast('Wine updated successfully', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update wine', 'error');
+    }
   };
 
-  const handleDelete = () => {
-    deleteWine(wine.id);
-    showToast('Wine removed from collection', 'info');
-    navigate('/collection');
+  const handleDelete = async () => {
+    try {
+      await deleteWine(wine.id);
+      showToast('Wine removed from collection', 'info');
+      navigate('/collection');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete wine', 'error');
+    }
   };
 
-  const handleDrink = () => {
+  const handleDrink = async () => {
     if (wine.quantity <= 0) return;
 
     const newNote: TastingNote = {
@@ -95,20 +103,24 @@ export function WineDetail() {
       context: 'Opened bottle',
     };
 
-    updateWine({
-      ...wine,
-      quantity: wine.quantity - 1,
-      tastingNotes: [...wine.tastingNotes, newNote],
-      isOpen: true,
-    });
+    try {
+      await updateWine({
+        ...wine,
+        quantity: wine.quantity - 1,
+        tastingNotes: [...wine.tastingNotes, newNote],
+        isOpen: true,
+      });
 
-    setShowDrinkModal(false);
-    setTastingNotes('');
-    setTastingRating(0);
-    showToast('Bottle opened! Enjoy your wine.', 'success');
+      setShowDrinkModal(false);
+      setTastingNotes('');
+      setTastingRating(0);
+      showToast('Bottle opened! Enjoy your wine.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to open bottle', 'error');
+    }
   };
 
-  const handleAddTastingNote = () => {
+  const handleAddTastingNote = async () => {
     const newNote: TastingNote = {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
@@ -116,28 +128,40 @@ export function WineDetail() {
       rating: tastingRating > 0 ? tastingRating : undefined,
     };
 
-    updateWine({
-      ...wine,
-      tastingNotes: [...wine.tastingNotes, newNote],
-    });
+    try {
+      await updateWine({
+        ...wine,
+        tastingNotes: [...wine.tastingNotes, newNote],
+      });
 
-    setShowTastingModal(false);
-    setTastingNotes('');
-    setTastingRating(0);
-    showToast('Tasting note added', 'success');
+      setShowTastingModal(false);
+      setTastingNotes('');
+      setTastingRating(0);
+      showToast('Tasting note added', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to add tasting note', 'error');
+    }
   };
 
-  const handleDeleteTastingNote = (noteId: string) => {
-    updateWine({
-      ...wine,
-      tastingNotes: wine.tastingNotes.filter(n => n.id !== noteId),
-    });
-    showToast('Tasting note removed', 'info');
+  const handleDeleteTastingNote = async (noteId: string) => {
+    try {
+      await updateWine({
+        ...wine,
+        tastingNotes: wine.tastingNotes.filter(n => n.id !== noteId),
+      });
+      showToast('Tasting note removed', 'info');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to remove tasting note', 'error');
+    }
   };
 
-  const handleQuantityChange = (delta: number) => {
+  const handleQuantityChange = async (delta: number) => {
     const newQuantity = Math.max(0, wine.quantity + delta);
-    updateWine({ ...wine, quantity: newQuantity });
+    try {
+      await updateWine({ ...wine, quantity: newQuantity });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update quantity', 'error');
+    }
   };
 
   const handleRefreshInfo = async () => {

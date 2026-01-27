@@ -3,6 +3,40 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 
+// Get allowed origins from environment variable, or use default for development
+const getAllowedOrigin = (req: VercelRequest): string => {
+  const origin = req.headers.origin;
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+
+  // In development, allow localhost
+  if (origin?.includes('localhost') || origin?.includes('127.0.0.1')) {
+    return origin;
+  }
+
+  // Check if origin is in allowed list
+  if (origin && allowedOrigins.includes(origin)) {
+    return origin;
+  }
+
+  // For Vercel deployments, allow the default Vercel domains
+  if (origin?.includes('.vercel.app')) {
+    return origin;
+  }
+
+  // Fallback to same-origin (no CORS header)
+  return '';
+};
+
+const setCorsHeaders = (req: VercelRequest, res: VercelResponse) => {
+  const allowedOrigin = getAllowedOrigin(req);
+  if (allowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+};
+
 interface RequestBody {
   action: 'extract-wine' | 'enrich-wine' | 'sommelier-chat' | 'restaurant-advisor';
   imageBase64?: string;
@@ -67,9 +101,7 @@ const WINE_EXTRACTION_SCHEMA = `{
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    setCorsHeaders(req, res);
     return res.status(200).end();
   }
 
@@ -335,11 +367,11 @@ GUIDELINES:
     const textContent = data.content.find((c: { type: string }) => c.type === 'text');
     const result = textContent?.text || '';
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    setCorsHeaders(req, res);
     return res.status(200).json({ result });
   } catch (error) {
     console.error('Claude proxy error:', error);
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    setCorsHeaders(req, res);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Unknown error'
     });

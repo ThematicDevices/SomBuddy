@@ -1,5 +1,3 @@
-import { Wine } from './wine';
-
 export interface RestaurantWine {
   name: string;
   vintage?: number;
@@ -10,10 +8,14 @@ export interface RestaurantWine {
   description?: string;
 }
 
+export interface CollectionWineRef {
+  id: string;
+}
+
 export interface WineComparison {
   recommendation: 'bring' | 'buy';
   restaurantWine: RestaurantWine;
-  collectionWine?: Wine;
+  collectionWine?: CollectionWineRef;
   collectionWineValue: number;
   corkageFee: number;
   totalBringCost: number;

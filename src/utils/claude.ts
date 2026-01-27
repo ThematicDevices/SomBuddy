@@ -40,16 +40,20 @@ const CLAUDE_PROXY_URL = '/api/claude-proxy';
 const VALID_WINE_COLORS: WineColor[] = ['red', 'white', 'rosé', 'sparkling', 'dessert', 'fortified', 'orange'];
 
 function parseWineResponse(jsonString: string): ExtractedWineData {
+  // Try to extract JSON from the response
   const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('Could not parse wine data from response');
+    throw new Error('Could not parse wine data from response. The AI response did not contain valid JSON.');
   }
 
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(jsonMatch[0]);
   } catch (e) {
-    throw new Error(`Invalid JSON response: ${e instanceof Error ? e.message : 'Unknown parsing error'}`);
+    // Try to provide a more helpful error message
+    const errorMsg = e instanceof Error ? e.message : 'Unknown parsing error';
+    const preview = jsonMatch[0].substring(0, 100);
+    throw new Error(`Invalid JSON in response: ${errorMsg}. Preview: ${preview}...`);
   }
 
   // Parse tasting notes from AI into a profile (category + notes format)
@@ -200,16 +204,20 @@ export async function getSommelierRecommendation(
 }
 
 function parseRestaurantResponse(jsonString: string): RestaurantAnalysis {
+  // Try to extract JSON from the response
   const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('Could not parse restaurant analysis from response');
+    throw new Error('Could not parse restaurant analysis from response. The AI response did not contain valid JSON.');
   }
 
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(jsonMatch[0]);
   } catch (e) {
-    throw new Error(`Invalid JSON response: ${e instanceof Error ? e.message : 'Unknown parsing error'}`);
+    // Try to provide a more helpful error message
+    const errorMsg = e instanceof Error ? e.message : 'Unknown parsing error';
+    const preview = jsonMatch[0].substring(0, 100);
+    throw new Error(`Invalid JSON in restaurant analysis: ${errorMsg}. Preview: ${preview}...`);
   }
 
   const recommendations = Array.isArray(parsed.recommendations)

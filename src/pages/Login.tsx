@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, useToast } from '../contexts';
 import { Wine, Loader2, Eye, EyeOff } from 'lucide-react';
@@ -19,9 +19,10 @@ export function Login() {
 
     const { error } = await signIn(email, password);
 
+    setIsLoading(false);
+
     if (error) {
       showToast(error.message, 'error');
-      setIsLoading(false);
     } else {
       showToast('Welcome back!', 'success');
       navigate('/');

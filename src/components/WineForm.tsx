@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WineFormData, wineColorOptions, commonVarietals, createDefaultWine } from '../types';
 import { Plus, X, ChevronDown } from 'lucide-react';
 
@@ -24,13 +24,25 @@ export function WineForm({
     ...initialData,
   });
 
+  // Track previous initialData to only update on meaningful changes
+  const prevInitialDataRef = useRef<Partial<WineFormData> | undefined>(initialData);
+
   // Sync form data with initialData when it changes (for enrichment)
-  React.useEffect(() => {
-    if (initialData) {
-      setFormData(prev => ({
-        ...prev,
-        ...initialData,
-      }));
+  // Only update fields that have actually changed to preserve user input
+  useEffect(() => {
+    if (initialData && prevInitialDataRef.current !== initialData) {
+      const hasNewData = Object.entries(initialData).some(([key, value]) => {
+        const prevValue = prevInitialDataRef.current?.[key as keyof WineFormData];
+        return value !== undefined && value !== prevValue;
+      });
+
+      if (hasNewData) {
+        setFormData(prev => ({
+          ...prev,
+          ...initialData,
+        }));
+      }
+      prevInitialDataRef.current = initialData;
     }
   }, [initialData]);
 

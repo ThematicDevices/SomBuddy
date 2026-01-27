@@ -3,6 +3,7 @@ export { ToastContainer } from './Toast';
 export { Modal } from './Modal';
 export { WineCard } from './WineCard';
 export { WineForm } from './WineForm';
+export { ErrorBoundary } from './ErrorBoundary';
 export { ImageUpload } from './ImageUpload';
 export { ProtectedRoute } from './ProtectedRoute';
 export { WineListInput } from './WineListInput';

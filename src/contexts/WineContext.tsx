@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { Wine, WineFormData } from '../types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
@@ -81,7 +81,7 @@ function dbRowToWine(row: any): Wine {
   };
 }
 
-export function WineProvider({ children }: { children: React.ReactNode }) {
+export function WineProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [wines, setWines] = useState<Wine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
