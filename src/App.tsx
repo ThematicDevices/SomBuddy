@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { WineProvider, AuthProvider, ToastProvider, ChatProvider } from './contexts';
+import { WineProvider, AuthProvider, ToastProvider, ChatProvider, ApiKeyProvider } from './contexts';
 import { Layout, ProtectedRoute, ErrorBoundary } from './components';
 import {
   Dashboard,
@@ -21,9 +21,10 @@ function App() {
     <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
-          <WineProvider>
-            <ChatProvider>
-              <BrowserRouter>
+          <ApiKeyProvider>
+            <WineProvider>
+              <ChatProvider>
+                <BrowserRouter>
                 <Routes>
                   {/* Public routes */}
                   <Route path="/login" element={<Login />} />
@@ -50,9 +51,10 @@ function App() {
                     <Route path="search" element={<Search />} />
                   </Route>
                 </Routes>
-              </BrowserRouter>
-            </ChatProvider>
-          </WineProvider>
+                </BrowserRouter>
+              </ChatProvider>
+            </WineProvider>
+          </ApiKeyProvider>
         </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>

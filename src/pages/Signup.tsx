@@ -1,7 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth, useToast } from '../contexts';
-import { Wine, Loader2, Eye, EyeOff, Mail, CheckCircle } from 'lucide-react';
+import { Wine, Loader2, Eye, EyeOff, Mail, CheckCircle, Check, X } from 'lucide-react';
+
+// Password strength validation
+interface PasswordRequirement {
+  label: string;
+  test: (password: string) => boolean;
+}
+
+const passwordRequirements: PasswordRequirement[] = [
+  { label: 'At least 8 characters', test: (p) => p.length >= 8 },
+  { label: 'Contains uppercase letter', test: (p) => /[A-Z]/.test(p) },
+  { label: 'Contains lowercase letter', test: (p) => /[a-z]/.test(p) },
+  { label: 'Contains a number', test: (p) => /\d/.test(p) },
+];
 
 export function Signup() {
   const { signUp } = useAuth();
@@ -15,6 +28,16 @@ export function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  // Prevent double-submit
+  const isSubmittingRef = useRef(false);
+
+  // Calculate password strength
+  const passwordStrength = useMemo(() => {
+    return passwordRequirements.filter(req => req.test(password)).length;
+  }, [password]);
+
+  const isPasswordStrong = passwordStrength === passwordRequirements.length;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -23,21 +46,27 @@ export function Signup() {
       return;
     }
 
-    if (password.length < 6) {
-      showToast('Password must be at least 6 characters', 'error');
+    if (!isPasswordStrong) {
+      showToast('Please meet all password requirements', 'error');
       return;
     }
 
+    // Prevent double-submit
+    if (isSubmittingRef.current || isLoading) return;
+    isSubmittingRef.current = true;
     setIsLoading(true);
 
-    const { error } = await signUp(email, password, fullName);
+    try {
+      const { error } = await signUp(email, password, fullName);
 
-    if (error) {
-      showToast(error.message, 'error');
+      if (error) {
+        showToast(error.message, 'error');
+      } else {
+        setIsSuccess(true);
+      }
+    } finally {
       setIsLoading(false);
-    } else {
-      setIsLoading(false);
-      setIsSuccess(true);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -111,6 +140,7 @@ export function Signup() {
               </label>
               <input
                 type="text"
+                autoComplete="name"
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
                 className="w-full px-4 py-3 border border-charcoal-200 rounded-xl focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
@@ -125,6 +155,7 @@ export function Signup() {
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 className="w-full px-4 py-3 border border-charcoal-200 rounded-xl focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
@@ -140,6 +171,7 @@ export function Signup() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="new-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="w-full px-4 py-3 pr-12 border border-charcoal-200 rounded-xl focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
@@ -153,6 +185,41 @@ export function Signup() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {/* Password strength indicator */}
+              {password && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4].map((level) => (
+                      <div
+                        key={level}
+                        className={`h-1 flex-1 rounded-full transition-colors ${
+                          passwordStrength >= level
+                            ? passwordStrength === 4
+                              ? 'bg-green-500'
+                              : passwordStrength >= 3
+                              ? 'bg-yellow-500'
+                              : 'bg-red-500'
+                            : 'bg-charcoal-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <ul className="text-xs space-y-0.5">
+                    {passwordRequirements.map((req, i) => (
+                      <li key={i} className="flex items-center gap-1">
+                        {req.test(password) ? (
+                          <Check className="w-3 h-3 text-green-500" />
+                        ) : (
+                          <X className="w-3 h-3 text-charcoal-300" />
+                        )}
+                        <span className={req.test(password) ? 'text-green-600' : 'text-charcoal-400'}>
+                          {req.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div>
@@ -162,11 +229,19 @@ export function Signup() {
               <input
                 type="password"
                 required
+                autoComplete="new-password"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-charcoal-200 rounded-xl focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors ${
+                  confirmPassword && confirmPassword !== password
+                    ? 'border-red-300 bg-red-50'
+                    : 'border-charcoal-200'
+                }`}
                 placeholder="••••••••"
               />
+              {confirmPassword && confirmPassword !== password && (
+                <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+              )}
             </div>
 
             <button

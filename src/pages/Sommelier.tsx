@@ -2,7 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useWines, useToast, useChatHistory } from '../contexts';
 import { getSommelierRecommendation } from '../utils';
 import { ChatMessage } from '../types';
-import { Send, Wine, Loader2, Trash2, User, Bot } from 'lucide-react';
+import { Send, Wine, Loader2, Trash2, User, Bot, RotateCw } from 'lucide-react';
+
+const MAX_RETRIES = 2;
 
 export function Sommelier() {
   const { wines } = useWines();
@@ -11,6 +13,8 @@ export function Sommelier() {
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -22,20 +26,25 @@ export function Sommelier() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (messageText?: string, isRetry = false) => {
+    const textToSend = messageText || input.trim();
+    if (!textToSend || isLoading) return;
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content: textToSend,
       timestamp: new Date().toISOString(),
     };
 
-    // Add message to context (persists to Supabase)
-    await addMessage(userMessage);
-    setInput('');
+    // Only add user message if this is not a retry
+    if (!isRetry) {
+      await addMessage(userMessage);
+      setInput('');
+    }
+
     setIsLoading(true);
+    setLastFailedMessage(null);
 
     try {
       // Only include recent conversation history (last 10 messages) to reduce payload
@@ -79,13 +88,30 @@ export function Sommelier() {
 
       // Add assistant message to context (persists to Supabase)
       await addMessage(assistantMessage);
+      setRetryCount(0);
     } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : 'Failed to get response',
-        'error'
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get response';
+
+      // Auto-retry for transient errors
+      if (retryCount < MAX_RETRIES) {
+        setRetryCount(prev => prev + 1);
+        showToast(`Retrying... (${retryCount + 1}/${MAX_RETRIES})`, 'info');
+        setTimeout(() => handleSend(textToSend, true), 1000 * (retryCount + 1));
+        return;
+      }
+
+      setLastFailedMessage(textToSend);
+      setRetryCount(0);
+      showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (lastFailedMessage) {
+      setRetryCount(0);
+      handleSend(lastFailedMessage, true);
     }
   };
 
@@ -204,6 +230,18 @@ export function Sommelier() {
               <div className="px-4 py-3 bg-charcoal-100 rounded-2xl rounded-bl-md">
                 <Loader2 className="w-5 h-5 text-charcoal-500 animate-spin" />
               </div>
+            </div>
+          )}
+
+          {lastFailedMessage && !isLoading && (
+            <div className="flex items-center justify-center">
+              <button
+                onClick={handleRetry}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <RotateCw className="w-4 h-4" />
+                <span>Retry last message</span>
+              </button>
             </div>
           )}
 

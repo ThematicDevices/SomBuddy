@@ -211,17 +211,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('No user logged in') };
 
+    // Save previous state for rollback
+    const previousProfile = profile;
+
+    // Optimistic update
+    setProfile(prev => prev ? { ...prev, ...updates } : null);
+
     const { error } = await supabase
       .from('profiles')
       .update(updates)
       .eq('id', user.id);
 
-    if (!error) {
-      setProfile(prev => prev ? { ...prev, ...updates } : null);
+    if (error) {
+      // Rollback on error
+      setProfile(previousProfile);
+      return { error: new Error(error.message) };
     }
 
-    return { error: error ? new Error(error.message) : null };
-  }, [user]);
+    return { error: null };
+  }, [user, profile]);
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {

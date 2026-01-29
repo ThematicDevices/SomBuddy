@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, useToast } from '../contexts';
 import { Wine, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn } = useAuth();
   const { showToast } = useToast();
 
@@ -13,19 +14,31 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Prevent double-submit race condition
+  const isSubmittingRef = useRef(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent double-submit
+    if (isSubmittingRef.current || isLoading) return;
+    isSubmittingRef.current = true;
     setIsLoading(true);
 
-    const { error } = await signIn(email, password);
+    try {
+      const { error } = await signIn(email, password);
 
-    setIsLoading(false);
-
-    if (error) {
-      showToast(error.message, 'error');
-    } else {
-      showToast('Welcome back!', 'success');
-      navigate('/');
+      if (error) {
+        showToast(error.message, 'error');
+      } else {
+        showToast('Welcome back!', 'success');
+        // Redirect to original location or home
+        const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+        navigate(from, { replace: true });
+      }
+    } finally {
+      setIsLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -49,6 +62,7 @@ export function Login() {
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 className="w-full px-4 py-3 border border-charcoal-200 rounded-xl focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
@@ -64,6 +78,7 @@ export function Login() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="w-full px-4 py-3 pr-12 border border-charcoal-200 rounded-xl focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"

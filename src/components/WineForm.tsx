@@ -292,7 +292,23 @@ export function WineForm({
             required
             min="1"
             value={formData.quantity}
-            onChange={e => updateField('quantity', parseInt(e.target.value) || 1)}
+            onChange={e => {
+              const value = parseInt(e.target.value);
+              // Only update if value is a valid positive number
+              if (!isNaN(value) && value >= 1) {
+                updateField('quantity', value);
+              } else if (e.target.value === '') {
+                // Allow empty to clear field temporarily
+                updateField('quantity', 1);
+              }
+            }}
+            onBlur={e => {
+              // Ensure minimum value of 1 on blur
+              const value = parseInt(e.target.value);
+              if (isNaN(value) || value < 1) {
+                updateField('quantity', 1);
+              }
+            }}
             className="w-full px-3 py-2 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
           />
         </div>
