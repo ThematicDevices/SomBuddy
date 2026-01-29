@@ -13,5 +13,16 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // Use localStorage directly to avoid lock contention issues
+    // that cause AbortError in React StrictMode
+    storage: localStorage,
+    // Disable the storage lock which causes AbortError
+    storageKey: 'sb-auth-token',
+    flowType: 'pkce',
+  },
+  global: {
+    headers: {
+      'x-client-info': 'sombuddy-web',
+    },
   },
 });

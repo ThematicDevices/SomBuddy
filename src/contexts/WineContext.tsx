@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
 import { Wine, WineFormData } from '../types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
@@ -15,6 +15,23 @@ interface WineContextType {
 }
 
 const WineContext = createContext<WineContextType | null>(null);
+
+// Helper to check if an error is an AbortError (should be ignored)
+const isAbortError = (error: unknown): boolean => {
+  if (error instanceof Error) {
+    return (
+      error.name === 'AbortError' ||
+      error.message.includes('AbortError') ||
+      error.message.includes('signal is aborted')
+    );
+  }
+  // Check for Supabase error objects
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = String((error as { message: unknown }).message);
+    return message.includes('AbortError') || message.includes('signal is aborted');
+  }
+  return false;
+};
 
 function formDataToWineInsert(formData: WineFormData, userId: string) {
   return {
@@ -106,13 +123,16 @@ export function WineProvider({ children }: { children: ReactNode }) {
       if (signal?.aborted) return;
 
       if (error) {
-        console.error('Error fetching wines:', error);
+        // Don't log AbortError - it's expected during rapid state changes
+        if (!isAbortError(error)) {
+          console.error('Error fetching wines:', error);
+        }
       } else {
         setWines((data || []).map(dbRowToWine));
       }
     } catch (error) {
       // Ignore abort errors (caused by React StrictMode double-mounting)
-      if (error instanceof Error && error.name === 'AbortError') return;
+      if (isAbortError(error)) return;
       console.error('Error fetching wines:', error);
     }
     if (!signal?.aborted) {

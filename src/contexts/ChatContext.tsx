@@ -15,6 +15,23 @@ const ChatContext = createContext<ChatContextType | null>(null);
 
 const MAX_MESSAGES = 100;
 
+// Helper to check if an error is an AbortError (should be ignored)
+const isAbortError = (error: unknown): boolean => {
+  if (error instanceof Error) {
+    return (
+      error.name === 'AbortError' ||
+      error.message.includes('AbortError') ||
+      error.message.includes('signal is aborted')
+    );
+  }
+  // Check for Supabase error objects
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = String((error as { message: unknown }).message);
+    return message.includes('AbortError') || message.includes('signal is aborted');
+  }
+  return false;
+};
+
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -48,7 +65,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (!mountedRef.current) return;
 
       if (error) {
-        console.error('Error fetching chat history:', error);
+        // Don't log AbortError - it's expected during rapid state changes
+        if (!isAbortError(error)) {
+          console.error('Error fetching chat history:', error);
+        }
       } else {
         const chatMessages: ChatMessage[] = (data || []).map((row: any) => ({
           id: row.id,
@@ -59,6 +79,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setMessages(chatMessages);
       }
     } catch (error) {
+      // Ignore abort errors (caused by React StrictMode double-mounting)
+      if (isAbortError(error)) return;
       console.error('Error fetching chat history:', error);
     }
     if (mountedRef.current) {

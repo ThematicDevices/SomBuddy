@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -23,6 +23,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Helper to check if an error is an AbortError (should be ignored)
+const isAbortError = (error: unknown): boolean => {
+  return error instanceof Error && (
+    error.name === 'AbortError' ||
+    error.message.includes('AbortError') ||
+    error.message.includes('signal is aborted')
+  );
+};
+
 // Auth-specific errors that indicate corrupted session
 const isCorruptedSessionError = (error: unknown): boolean => {
   if (error instanceof Error) {
@@ -45,7 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  // Refs for debouncing and cleanup
+  const mountedRef = useRef(true);
+  const profileFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
+
+  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    // Skip if we already fetched for this user recently
+    if (lastFetchedUserIdRef.current === userId) {
+      return profile;
+    }
+
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -54,15 +73,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
+        // Don't log AbortError - it's expected during rapid state changes
+        if (!isAbortError(error)) {
+          console.error('Error fetching profile:', error);
+        }
         return null;
       }
+
+      lastFetchedUserIdRef.current = userId;
       return data as Profile;
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      // Don't log AbortError
+      if (!isAbortError(error)) {
+        console.error('Error fetching profile:', error);
+      }
       return null;
     }
-  }, []);
+  }, [profile]);
 
   const clearCorruptedSession = useCallback(() => {
     try {
@@ -81,27 +108,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setUser(null);
     setProfile(null);
+    lastFetchedUserIdRef.current = null;
   }, []);
 
+  // Debounced profile fetch to prevent rapid-fire fetches
+  const debouncedFetchProfile = useCallback((userId: string) => {
+    // Clear any pending fetch
+    if (profileFetchTimeoutRef.current) {
+      clearTimeout(profileFetchTimeoutRef.current);
+    }
+
+    // Delay the fetch to allow auth state to stabilize
+    profileFetchTimeoutRef.current = setTimeout(async () => {
+      if (!mountedRef.current) return;
+
+      const fetchedProfile = await fetchProfile(userId);
+      if (mountedRef.current && fetchedProfile) {
+        setProfile(fetchedProfile);
+      }
+    }, 100);
+  }, [fetchProfile]);
+
   useEffect(() => {
-    let isMounted = true;
+    mountedRef.current = true;
 
     const initializeAuth = async () => {
       try {
-        // Increased timeout to 10s for slower networks
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Session restoration timed out')), 10000);
-        });
+        const { data: { session }, error } = await supabase.auth.getSession();
 
-        const sessionPromise = supabase.auth.getSession();
+        if (!mountedRef.current) return;
 
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
-
-        if (!isMounted) return;
-
-        // Check for auth-specific errors
         if (error) {
-          console.error('Session error:', error);
+          // Don't log AbortError
+          if (!isAbortError(error)) {
+            console.error('Session error:', error);
+          }
           if (isCorruptedSessionError(error)) {
             clearCorruptedSession();
           }
@@ -113,25 +154,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          const profile = await fetchProfile(session.user.id);
-          if (isMounted) setProfile(profile);
+          debouncedFetchProfile(session.user.id);
         }
       } catch (error) {
-        // Ignore abort errors (caused by React StrictMode double-mounting)
-        if (error instanceof Error && error.name === 'AbortError') return;
+        // Ignore AbortError completely
+        if (isAbortError(error)) return;
 
         console.error('Session initialization error:', error);
 
-        // Only clear session on auth-specific errors or timeout, not network issues
-        if (isMounted) {
+        if (mountedRef.current) {
           if (isCorruptedSessionError(error) || (error instanceof Error && error.message.includes('timed out'))) {
             clearCorruptedSession();
           }
-          // For other errors (network issues), keep the existing session state
-          // and let the user retry
         }
       } finally {
-        if (isMounted) {
+        if (mountedRef.current) {
           setIsLoading(false);
         }
       }
@@ -141,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
-        if (!isMounted) return;
+        if (!mountedRef.current) return;
 
         console.log('Auth state change:', event);
 
@@ -149,15 +186,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          const profile = await fetchProfile(session.user.id);
-          if (isMounted) setProfile(profile);
+          // Use debounced fetch to prevent rapid profile fetches
+          debouncedFetchProfile(session.user.id);
         } else {
           setProfile(null);
+          lastFetchedUserIdRef.current = null;
         }
 
-        // Handle specific auth events
         if (event === 'SIGNED_OUT') {
           setProfile(null);
+          lastFetchedUserIdRef.current = null;
         } else if (event === 'TOKEN_REFRESHED') {
           console.log('Token refreshed successfully');
         }
@@ -165,17 +203,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
-      isMounted = false;
+      mountedRef.current = false;
+      if (profileFetchTimeoutRef.current) {
+        clearTimeout(profileFetchTimeoutRef.current);
+      }
       subscription.unsubscribe();
     };
-  }, [fetchProfile, clearCorruptedSession]);
+  }, [debouncedFetchProfile, clearCorruptedSession]);
 
   // Refresh session when app becomes visible (user returns to tab)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && session) {
-        // Trigger a session check which will refresh token if needed
-        supabase.auth.getSession().catch(console.error);
+        supabase.auth.getSession().catch((error: unknown) => {
+          if (!isAbortError(error)) {
+            console.error('Visibility refresh error:', error);
+          }
+        });
       }
     };
 
@@ -205,16 +249,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    lastFetchedUserIdRef.current = null;
     await supabase.auth.signOut();
   }, []);
 
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('No user logged in') };
 
-    // Save previous state for rollback
     const previousProfile = profile;
-
-    // Optimistic update
     setProfile(prev => prev ? { ...prev, ...updates } : null);
 
     const { error } = await supabase
@@ -223,7 +265,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', user.id);
 
     if (error) {
-      // Rollback on error
       setProfile(previousProfile);
       return { error: new Error(error.message) };
     }
