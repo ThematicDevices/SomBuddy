@@ -4,7 +4,7 @@ import { ImageUpload, WineForm } from '../components';
 import { useWines, useToast } from '../contexts';
 import { extractWineFromImage, enrichWineData } from '../utils';
 import { WineFormData, createDefaultWine } from '../types';
-import { Camera, Edit3, AlertCircle, Sparkles, Loader2, Images } from 'lucide-react';
+import { Camera, Edit3, AlertCircle, Sparkles, Loader2, Layers } from 'lucide-react';
 
 type AddStep = 'choose' | 'photo' | 'validate' | 'manual';
 
@@ -187,7 +187,7 @@ export function AddWine() {
             className="flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-wine-50 to-gold-50 rounded-xl border-2 border-wine-100 hover:border-wine-300 transition-all group"
           >
             <div className="w-10 h-10 bg-wine-100 rounded-full flex items-center justify-center group-hover:bg-wine-200 transition-colors">
-              <Images className="w-5 h-5 text-wine-700" />
+              <Layers className="w-5 h-5 text-wine-700" />
             </div>
             <div className="text-left">
               <h3 className="font-semibold text-charcoal-900">Batch Upload</h3>

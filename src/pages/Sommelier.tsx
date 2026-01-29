@@ -1,16 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useWines, useToast } from '../contexts';
+import { useWines, useToast, useChatHistory } from '../contexts';
 import { getSommelierRecommendation } from '../utils';
 import { ChatMessage } from '../types';
 import { Send, Wine, Loader2, Trash2, User, Bot } from 'lucide-react';
 
-const MAX_MESSAGES = 100;
-
 export function Sommelier() {
   const { wines } = useWines();
   const { showToast } = useToast();
+  const { messages, isLoading: isLoadingHistory, addMessage, clearHistory } = useChatHistory();
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,17 +32,21 @@ export function Sommelier() {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // Add message to context (persists to Supabase)
+    await addMessage(userMessage);
     setInput('');
     setIsLoading(true);
 
     try {
       // Only include recent conversation history (last 10 messages) to reduce payload
       const recentMessages = messages.slice(-10);
-      const conversationHistory = recentMessages.map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
+      const conversationHistory = [
+        ...recentMessages.map(m => ({
+          role: m.role,
+          content: m.content,
+        })),
+        { role: userMessage.role, content: userMessage.content },
+      ];
 
       // Send only essential wine fields to reduce payload size
       const summarizedWines = wines.map(w => ({
@@ -75,13 +77,8 @@ export function Sommelier() {
         timestamp: new Date().toISOString(),
       };
 
-      setMessages(prev => {
-        const newMessages = [...prev, assistantMessage];
-        if (newMessages.length > MAX_MESSAGES) {
-          return newMessages.slice(-MAX_MESSAGES);
-        }
-        return newMessages;
-      });
+      // Add assistant message to context (persists to Supabase)
+      await addMessage(assistantMessage);
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : 'Failed to get response',
@@ -92,8 +89,8 @@ export function Sommelier() {
     }
   };
 
-  const handleClearChat = () => {
-    setMessages([]);
+  const handleClearChat = async () => {
+    await clearHistory();
     showToast('Chat history cleared', 'info');
   };
 
@@ -103,6 +100,14 @@ export function Sommelier() {
     "Suggest a pairing for grilled steak",
     "What wines should I age longer?",
   ];
+
+  if (isLoadingHistory) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <Loader2 className="w-8 h-8 text-wine-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-6rem)]">
