@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 interface Profile {
@@ -23,6 +23,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Auth-specific errors that indicate corrupted session
+const isCorruptedSessionError = (error: unknown): boolean => {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('invalid token') ||
+      message.includes('jwt expired') ||
+      message.includes('invalid jwt') ||
+      message.includes('session not found') ||
+      message.includes('invalid refresh token') ||
+      message.includes('refresh token not found')
+    );
+  }
+  return false;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -30,17 +46,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
+      return data as Profile;
+    } catch (error) {
       console.error('Error fetching profile:', error);
       return null;
     }
-    return data as Profile;
+  }, []);
+
+  const clearCorruptedSession = useCallback(() => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      console.log('Cleared corrupted session data from localStorage');
+    } catch (clearError) {
+      console.warn('Failed to clear localStorage:', clearError);
+    }
+    setSession(null);
+    setUser(null);
+    setProfile(null);
   }, []);
 
   useEffect(() => {
@@ -48,16 +88,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        // Add timeout to prevent hanging on corrupted sessions
+        // Increased timeout to 10s for slower networks
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Session restoration timed out')), 5000);
+          setTimeout(() => reject(new Error('Session restoration timed out')), 10000);
         });
 
         const sessionPromise = supabase.auth.getSession();
 
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
 
         if (!isMounted) return;
+
+        // Check for auth-specific errors
+        if (error) {
+          console.error('Session error:', error);
+          if (isCorruptedSessionError(error)) {
+            clearCorruptedSession();
+          }
+          setIsLoading(false);
+          return;
+        }
 
         setSession(session);
         setUser(session?.user ?? null);
@@ -72,25 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         console.error('Session initialization error:', error);
 
-        // Clear potentially corrupted session data directly from localStorage
-        // Don't use supabase.auth.signOut() as it may also hang on corrupted sessions
+        // Only clear session on auth-specific errors or timeout, not network issues
         if (isMounted) {
-          try {
-            const keysToRemove: string[] = [];
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
-              if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-                keysToRemove.push(key);
-              }
-            }
-            keysToRemove.forEach(key => localStorage.removeItem(key));
-            console.log('Cleared corrupted session data from localStorage');
-          } catch (clearError) {
-            console.warn('Failed to clear localStorage:', clearError);
+          if (isCorruptedSessionError(error) || (error instanceof Error && error.message.includes('timed out'))) {
+            clearCorruptedSession();
           }
-          setSession(null);
-          setUser(null);
-          setProfile(null);
+          // For other errors (network issues), keep the existing session state
+          // and let the user retry
         }
       } finally {
         if (isMounted) {
@@ -102,8 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         if (!isMounted) return;
+
+        console.log('Auth state change:', event);
+
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -114,8 +155,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
         }
 
+        // Handle specific auth events
         if (event === 'SIGNED_OUT') {
           setProfile(null);
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('Token refreshed successfully');
         }
       }
     );
@@ -124,7 +168,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, clearCorruptedSession]);
+
+  // Refresh session when app becomes visible (user returns to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && session) {
+        // Trigger a session check which will refresh token if needed
+        supabase.auth.getSession().catch(console.error);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [session]);
 
   const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
     const { error } = await supabase.auth.signUp({
