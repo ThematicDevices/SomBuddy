@@ -72,13 +72,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         console.error('Session initialization error:', error);
 
-        // Clear potentially corrupted session data
+        // Clear potentially corrupted session data directly from localStorage
+        // Don't use supabase.auth.signOut() as it may also hang on corrupted sessions
         if (isMounted) {
           try {
-            await supabase.auth.signOut();
-          } catch (signOutError) {
-            // Ignore signOut errors - we're just trying to clear corrupted data
-            console.warn('Failed to clear session:', signOutError);
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+                keysToRemove.push(key);
+              }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            console.log('Cleared corrupted session data from localStorage');
+          } catch (clearError) {
+            console.warn('Failed to clear localStorage:', clearError);
           }
           setSession(null);
           setUser(null);
