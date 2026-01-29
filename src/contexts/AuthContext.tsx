@@ -46,22 +46,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).then((profile) => {
-          if (isMounted) setProfile(profile);
+    const initializeAuth = async () => {
+      try {
+        // Add timeout to prevent hanging on corrupted sessions
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Session restoration timed out')), 10000);
         });
+
+        const sessionPromise = supabase.auth.getSession();
+
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+
+        if (!isMounted) return;
+
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id);
+          if (isMounted) setProfile(profile);
+        }
+      } catch (error) {
+        // Ignore abort errors (caused by React StrictMode double-mounting)
+        if (error instanceof Error && error.name === 'AbortError') return;
+
+        console.error('Session initialization error:', error);
+
+        // Clear potentially corrupted session data
+        if (isMounted) {
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            // Ignore signOut errors - we're just trying to clear corrupted data
+            console.warn('Failed to clear session:', signOutError);
+          }
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
-    }).catch((error) => {
-      // Ignore abort errors (caused by React StrictMode double-mounting)
-      if (error?.name === 'AbortError') return;
-      console.error('Session error:', error);
-      if (isMounted) setIsLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
