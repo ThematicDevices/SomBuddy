@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // Add timeout to prevent hanging on corrupted sessions
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Session restoration timed out')), 10000);
+          setTimeout(() => reject(new Error('Session restoration timed out')), 5000);
         });
 
         const sessionPromise = supabase.auth.getSession();
