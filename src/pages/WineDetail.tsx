@@ -176,7 +176,7 @@ export function WineDetail() {
         varietals: wine.varietals,
       });
 
-      updateWine({
+      await updateWine({
         ...wine,
         // Update market value with new estimated price
         estimatedValue: enrichedData.estimatedPrice,

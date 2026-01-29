@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { ImageItem } from '../components/MultiImageUpload';
 import { WineFormData } from '../types';
 import { extractWineFromImage } from '../utils';
@@ -30,7 +30,18 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
   const [items, setItems] = useState<ProcessingItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
+  const [shouldProcess, setShouldProcess] = useState(false);
   const cancelledRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cancelledRef.current = true;
+    };
+  }, []);
 
   const processImage = async (item: ProcessingItem): Promise<ProcessingItem> => {
     try {
@@ -70,36 +81,48 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
     }
   };
 
-  const processQueue = useCallback(async (processingItems: ProcessingItem[]) => {
-    setIsProcessing(true);
-    cancelledRef.current = false;
+  // Process queue when shouldProcess changes and items are ready
+  useEffect(() => {
+    if (!shouldProcess || items.length === 0) return;
 
-    for (let i = 0; i < processingItems.length; i++) {
-      if (cancelledRef.current) break;
+    const processQueue = async () => {
+      if (!mountedRef.current) return;
 
-      const item = processingItems[i];
-      if (item.status !== 'pending') continue;
+      setIsProcessing(true);
+      cancelledRef.current = false;
 
-      setCurrentIndex(i);
+      for (let i = 0; i < items.length; i++) {
+        if (cancelledRef.current || !mountedRef.current) break;
 
-      setItems((prev) =>
-        prev.map((p) =>
-          p.id === item.id ? { ...p, status: 'processing' as ProcessingStatus } : p
-        )
-      );
+        const item = items[i];
+        if (item.status !== 'pending') continue;
 
-      const result = await processImage(item);
+        setCurrentIndex(i);
 
-      if (cancelledRef.current) break;
+        setItems((prev) =>
+          prev.map((p) =>
+            p.id === item.id ? { ...p, status: 'processing' as ProcessingStatus } : p
+          )
+        );
 
-      setItems((prev) =>
-        prev.map((p) => (p.id === item.id ? result : p))
-      );
-    }
+        const result = await processImage(item);
 
-    setIsProcessing(false);
-    setCurrentIndex(-1);
-  }, []);
+        if (cancelledRef.current || !mountedRef.current) break;
+
+        setItems((prev) =>
+          prev.map((p) => (p.id === item.id ? result : p))
+        );
+      }
+
+      if (mountedRef.current) {
+        setIsProcessing(false);
+        setCurrentIndex(-1);
+        setShouldProcess(false);
+      }
+    };
+
+    processQueue();
+  }, [shouldProcess, items.length]); // Only trigger when shouldProcess is set or items array length changes initially
 
   const startProcessing = useCallback((images: ImageItem[]) => {
     const processingItems: ProcessingItem[] = images.map((image) => ({
@@ -108,15 +131,17 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
       status: 'pending' as ProcessingStatus,
     }));
 
+    cancelledRef.current = false;
     setItems(processingItems);
     setCurrentIndex(0);
-    processQueue(processingItems);
-  }, [processQueue]);
+    setShouldProcess(true); // Trigger processing via useEffect
+  }, []);
 
   const cancelProcessing = useCallback(() => {
     cancelledRef.current = true;
     setIsProcessing(false);
     setCurrentIndex(-1);
+    setShouldProcess(false);
 
     setItems((prev) =>
       prev.map((item) =>
@@ -130,20 +155,25 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
   }, []);
 
   const retryItem = useCallback(async (id: string) => {
-    const item = items.find((i) => i.id === id);
-    if (!item || item.status !== 'error') return;
-
-    setItems((prev) =>
-      prev.map((p) =>
+    setItems((prev) => {
+      const item = prev.find((i) => i.id === id);
+      if (!item || item.status !== 'error') return prev;
+      return prev.map((p) =>
         p.id === id ? { ...p, status: 'processing' as ProcessingStatus, error: undefined } : p
-      )
-    );
+      );
+    });
 
-    const result = await processImage(item);
+    // Find the item and process it
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
 
-    setItems((prev) =>
-      prev.map((p) => (p.id === id ? result : p))
-    );
+    const result = await processImage({ ...item, status: 'processing', error: undefined });
+
+    if (mountedRef.current) {
+      setItems((prev) =>
+        prev.map((p) => (p.id === id ? result : p))
+      );
+    }
   }, [items]);
 
   const reset = useCallback(() => {
@@ -151,6 +181,7 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
     setItems([]);
     setIsProcessing(false);
     setCurrentIndex(-1);
+    setShouldProcess(false);
   }, []);
 
   const successCount = items.filter((item) => item.status === 'success').length;

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { ChatMessage } from '../types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
@@ -19,6 +19,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const fetchChatHistory = useCallback(async () => {
     if (!user) {
@@ -36,6 +45,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         .order('created_at', { ascending: true })
         .limit(MAX_MESSAGES);
 
+      if (!mountedRef.current) return;
+
       if (error) {
         console.error('Error fetching chat history:', error);
       } else {
@@ -50,7 +61,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error fetching chat history:', error);
     }
-    setIsLoading(false);
+    if (mountedRef.current) {
+      setIsLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -59,6 +72,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const addMessage = useCallback(async (message: ChatMessage) => {
     if (!user) return;
+
+    // Store previous state for rollback
+    const previousMessages = messages;
 
     // Optimistically add to local state
     setMessages(prev => {
@@ -84,14 +100,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('Error saving chat message:', error);
+        // Rollback on error
+        if (mountedRef.current) {
+          setMessages(previousMessages);
+        }
       }
     } catch (error) {
       console.error('Error saving chat message:', error);
+      // Rollback on error
+      if (mountedRef.current) {
+        setMessages(previousMessages);
+      }
     }
-  }, [user]);
+  }, [user, messages]);
 
   const clearHistory = useCallback(async () => {
     if (!user) return;
+
+    // Store previous state for rollback
+    const previousMessages = messages;
 
     // Optimistically clear local state
     setMessages([]);
@@ -105,14 +132,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('Error clearing chat history:', error);
-        // Refetch to restore state if delete failed
-        fetchChatHistory();
+        // Rollback on error
+        if (mountedRef.current) {
+          setMessages(previousMessages);
+        }
       }
     } catch (error) {
       console.error('Error clearing chat history:', error);
-      fetchChatHistory();
+      // Rollback on error
+      if (mountedRef.current) {
+        setMessages(previousMessages);
+      }
     }
-  }, [user, fetchChatHistory]);
+  }, [user, messages]);
 
   const refreshHistory = useCallback(async () => {
     return fetchChatHistory();

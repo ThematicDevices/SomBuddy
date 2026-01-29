@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CheckCircle2, Plus, Trash2, Edit3, Wine } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Plus, Trash2, Edit3, Wine, AlertCircle, RotateCcw } from 'lucide-react';
 import { MultiImageUpload, ImageItem } from '../components/MultiImageUpload';
 import { BatchProcessingQueue } from '../components/BatchProcessingQueue';
 import { useBatchProcessor } from '../hooks/useBatchProcessor';
@@ -14,6 +14,8 @@ interface ReviewItem {
   data: Partial<WineFormData>;
   imagePreview: string;
   selected: boolean;
+  status: 'pending' | 'added' | 'failed';
+  error?: string;
 }
 
 export function BatchAddWines() {
@@ -57,6 +59,7 @@ export function BatchAddWines() {
         data: item.result!,
         imagePreview: item.image.preview,
         selected: true,
+        status: 'pending' as const,
       }));
 
     setReviewItems(successfulItems);
@@ -82,8 +85,49 @@ export function BatchAddWines() {
     setReviewItems((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const retryFailedItems = async () => {
+    const failedItems = reviewItems.filter((item) => item.status === 'failed');
+    if (failedItems.length === 0) return;
+
+    setIsAdding(true);
+
+    for (const item of failedItems) {
+      try {
+        const formData: WineFormData = {
+          ...createDefaultWine(),
+          ...item.data,
+        };
+        await addWine(formData);
+
+        // Mark as added
+        setReviewItems((prev) =>
+          prev.map((i) =>
+            i.id === item.id ? { ...i, status: 'added' as const, error: undefined } : i
+          )
+        );
+      } catch (err) {
+        // Update error message
+        setReviewItems((prev) =>
+          prev.map((i) =>
+            i.id === item.id
+              ? { ...i, error: err instanceof Error ? err.message : 'Failed to add' }
+              : i
+          )
+        );
+      }
+    }
+
+    setIsAdding(false);
+
+    const updatedFailedCount = reviewItems.filter((item) => item.status === 'failed').length;
+    if (updatedFailedCount === 0) {
+      showToast('All wines added successfully!', 'success');
+      navigate('/collection');
+    }
+  };
+
   const handleAddSelectedWines = async () => {
-    const selectedWines = reviewItems.filter((item) => item.selected);
+    const selectedWines = reviewItems.filter((item) => item.selected && item.status === 'pending');
     if (selectedWines.length === 0) {
       showToast('Please select at least one wine to add', 'error');
       return;
@@ -91,8 +135,8 @@ export function BatchAddWines() {
 
     setIsAdding(true);
     let addedCount = 0;
-    let errorCount = 0;
 
+    // Process each wine and track status
     for (const item of selectedWines) {
       try {
         const formData: WineFormData = {
@@ -101,21 +145,39 @@ export function BatchAddWines() {
         };
         await addWine(formData);
         addedCount++;
+
+        // Mark as added
+        setReviewItems((prev) =>
+          prev.map((i) =>
+            i.id === item.id ? { ...i, status: 'added' as const } : i
+          )
+        );
       } catch (err) {
         console.error('Failed to add wine:', err);
-        errorCount++;
+
+        // Mark as failed with error message
+        setReviewItems((prev) =>
+          prev.map((i) =>
+            i.id === item.id
+              ? { ...i, status: 'failed' as const, error: err instanceof Error ? err.message : 'Failed to add wine' }
+              : i
+          )
+        );
       }
     }
 
     setIsAdding(false);
 
-    if (errorCount === 0) {
+    // Check for any failures
+    const failedCount = reviewItems.filter((item) => item.status === 'failed').length;
+
+    if (failedCount === 0 && addedCount > 0) {
       showToast(`Successfully added ${addedCount} wine(s) to your collection!`, 'success');
       navigate('/collection');
-    } else if (addedCount > 0) {
-      showToast(`Added ${addedCount} wine(s), but ${errorCount} failed`, 'info');
-    } else {
-      showToast('Failed to add wines. Please try again.', 'error');
+    } else if (addedCount > 0 && failedCount > 0) {
+      showToast(`Added ${addedCount} wine(s). ${failedCount} failed - see details below.`, 'info');
+    } else if (addedCount === 0) {
+      showToast('Failed to add wines. Please check the errors below.', 'error');
     }
   };
 
@@ -282,17 +344,29 @@ export function BatchAddWines() {
                 <div
                   key={item.id}
                   className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
-                    item.selected
+                    item.status === 'failed'
+                      ? 'border-red-200 bg-red-50/30'
+                      : item.status === 'added'
+                      ? 'border-green-200 bg-green-50/30'
+                      : item.selected
                       ? 'border-wine-200 bg-wine-50/30'
                       : 'border-charcoal-100 bg-charcoal-50/50'
                   }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={item.selected}
-                    onChange={() => toggleItemSelection(item.id)}
-                    className="w-5 h-5 rounded border-charcoal-300 text-wine-600 focus:ring-wine-500"
-                  />
+                  {item.status === 'pending' && (
+                    <input
+                      type="checkbox"
+                      checked={item.selected}
+                      onChange={() => toggleItemSelection(item.id)}
+                      className="w-5 h-5 rounded border-charcoal-300 text-wine-600 focus:ring-wine-500"
+                    />
+                  )}
+                  {item.status === 'added' && (
+                    <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  )}
+                  {item.status === 'failed' && (
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                  )}
 
                   <img
                     src={item.imagePreview}
@@ -314,23 +388,46 @@ export function BatchAddWines() {
                         <span className="capitalize">• {item.data.wineColor}</span>
                       )}
                     </div>
+                    {item.status === 'failed' && item.error && (
+                      <p className="text-xs text-red-600 mt-1 truncate">
+                        Error: {item.error}
+                      </p>
+                    )}
+                    {item.status === 'added' && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Added to collection
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link
-                      to={`/add?prefill=${encodeURIComponent(JSON.stringify(item.data))}`}
-                      className="p-2 text-charcoal-500 hover:text-wine-700 hover:bg-wine-50 rounded-md transition-colors"
-                      title="Edit details"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </Link>
-                    <button
-                      onClick={() => removeReviewItem(item.id)}
-                      className="p-2 text-charcoal-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                      title="Remove"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {item.status === 'pending' && (
+                      <>
+                        <Link
+                          to={`/add?prefill=${encodeURIComponent(JSON.stringify(item.data))}`}
+                          className="p-2 text-charcoal-500 hover:text-wine-700 hover:bg-wine-50 rounded-md transition-colors"
+                          title="Edit details"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </Link>
+                        <button
+                          onClick={() => removeReviewItem(item.id)}
+                          className="p-2 text-charcoal-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title="Remove"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                    {item.status === 'failed' && (
+                      <button
+                        onClick={() => removeReviewItem(item.id)}
+                        className="p-2 text-charcoal-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -350,27 +447,49 @@ export function BatchAddWines() {
             </div>
 
             {reviewItems.length > 0 && (
-              <div className="flex justify-between items-center pt-4 border-t border-charcoal-100">
-                <button
-                  onClick={handleStartOver}
-                  className="px-4 py-2 text-charcoal-600 hover:text-charcoal-800 font-medium transition-colors"
-                >
-                  Start Over
-                </button>
-                <button
-                  onClick={handleAddSelectedWines}
-                  disabled={selectedCount === 0 || isAdding}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-wine-900 hover:bg-wine-800 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isAdding ? (
-                    <>Adding...</>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      Add {selectedCount} Wine{selectedCount !== 1 ? 's' : ''} to Collection
-                    </>
-                  )}
-                </button>
+              <div className="flex flex-col gap-4 pt-4 border-t border-charcoal-100">
+                {/* Show failed items summary with retry button */}
+                {reviewItems.some((item) => item.status === 'failed') && (
+                  <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                      <span className="text-sm text-red-700">
+                        {reviewItems.filter((item) => item.status === 'failed').length} wine(s) failed to add
+                      </span>
+                    </div>
+                    <button
+                      onClick={retryFailedItems}
+                      disabled={isAdding}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 rounded-md transition-colors disabled:opacity-50"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Retry Failed
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={handleStartOver}
+                    className="px-4 py-2 text-charcoal-600 hover:text-charcoal-800 font-medium transition-colors"
+                  >
+                    Start Over
+                  </button>
+                  <button
+                    onClick={handleAddSelectedWines}
+                    disabled={selectedCount === 0 || isAdding}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-wine-900 hover:bg-wine-800 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAdding ? (
+                      <>Adding...</>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        Add {selectedCount} Wine{selectedCount !== 1 ? 's' : ''} to Collection
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>
