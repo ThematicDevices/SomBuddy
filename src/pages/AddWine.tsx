@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ImageUpload, WineForm } from '../components';
 import { useWines, useToast } from '../contexts';
 import { extractWineFromImage, enrichWineData } from '../utils';
 import { WineFormData, createDefaultWine } from '../types';
-import { Camera, Edit3, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { Camera, Edit3, AlertCircle, Sparkles, Loader2, Images } from 'lucide-react';
 
 type AddStep = 'choose' | 'photo' | 'validate' | 'manual';
 
@@ -149,36 +149,53 @@ export function AddWine() {
       </div>
 
       {step === 'choose' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button
-            onClick={() => setStep('photo')}
-            className="flex flex-col items-center gap-4 p-8 bg-white rounded-xl border-2 border-charcoal-100 hover:border-wine-300 hover:bg-wine-50/30 transition-all group"
-          >
-            <div className="w-16 h-16 bg-wine-100 rounded-full flex items-center justify-center group-hover:bg-wine-200 transition-colors">
-              <Camera className="w-8 h-8 text-wine-700" />
-            </div>
-            <div className="text-center">
-              <h3 className="font-semibold text-charcoal-900 text-lg">Photo Capture</h3>
-              <p className="text-sm text-charcoal-500 mt-1">
-                Take a photo of the label and let AI extract details, tasting notes, and recommendations
-              </p>
-            </div>
-          </button>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={() => setStep('photo')}
+              className="flex flex-col items-center gap-4 p-8 bg-white rounded-xl border-2 border-charcoal-100 hover:border-wine-300 hover:bg-wine-50/30 transition-all group"
+            >
+              <div className="w-16 h-16 bg-wine-100 rounded-full flex items-center justify-center group-hover:bg-wine-200 transition-colors">
+                <Camera className="w-8 h-8 text-wine-700" />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-charcoal-900 text-lg">Photo Capture</h3>
+                <p className="text-sm text-charcoal-500 mt-1">
+                  Take a photo of the label and let AI extract details, tasting notes, and recommendations
+                </p>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setStep('manual')}
-            className="flex flex-col items-center gap-4 p-8 bg-white rounded-xl border-2 border-charcoal-100 hover:border-charcoal-300 hover:bg-charcoal-50/50 transition-all group"
+            <button
+              onClick={() => setStep('manual')}
+              className="flex flex-col items-center gap-4 p-8 bg-white rounded-xl border-2 border-charcoal-100 hover:border-charcoal-300 hover:bg-charcoal-50/50 transition-all group"
+            >
+              <div className="w-16 h-16 bg-charcoal-100 rounded-full flex items-center justify-center group-hover:bg-charcoal-200 transition-colors">
+                <Edit3 className="w-8 h-8 text-charcoal-600" />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-charcoal-900 text-lg">Manual Entry</h3>
+                <p className="text-sm text-charcoal-500 mt-1">
+                  Enter wine name and let AI fill in tasting notes, drinking window, and pairings
+                </p>
+              </div>
+            </button>
+          </div>
+
+          <Link
+            to="/add/batch"
+            className="flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-wine-50 to-gold-50 rounded-xl border-2 border-wine-100 hover:border-wine-300 transition-all group"
           >
-            <div className="w-16 h-16 bg-charcoal-100 rounded-full flex items-center justify-center group-hover:bg-charcoal-200 transition-colors">
-              <Edit3 className="w-8 h-8 text-charcoal-600" />
+            <div className="w-10 h-10 bg-wine-100 rounded-full flex items-center justify-center group-hover:bg-wine-200 transition-colors">
+              <Images className="w-5 h-5 text-wine-700" />
             </div>
-            <div className="text-center">
-              <h3 className="font-semibold text-charcoal-900 text-lg">Manual Entry</h3>
-              <p className="text-sm text-charcoal-500 mt-1">
-                Enter wine name and let AI fill in tasting notes, drinking window, and pairings
+            <div className="text-left">
+              <h3 className="font-semibold text-charcoal-900">Batch Upload</h3>
+              <p className="text-sm text-charcoal-500">
+                Add multiple wines at once (up to 10 images)
               </p>
             </div>
-          </button>
+          </Link>
         </div>
       )}
 

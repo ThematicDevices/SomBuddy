@@ -7,6 +7,7 @@ interface WineContextType {
   wines: Wine[];
   isLoading: boolean;
   addWine: (formData: WineFormData) => Promise<Wine>;
+  addWines: (formDataArray: WineFormData[]) => Promise<Wine[]>;
   updateWine: (wine: Wine) => Promise<void>;
   deleteWine: (wineId: string) => Promise<void>;
   getWine: (wineId: string) => Wine | undefined;
@@ -149,6 +150,23 @@ export function WineProvider({ children }: { children: ReactNode }) {
     return wine;
   }, [user]);
 
+  const addWines = useCallback(async (formDataArray: WineFormData[]): Promise<Wine[]> => {
+    if (!user) throw new Error('Must be logged in to add wines');
+    if (formDataArray.length === 0) return [];
+
+    const insertData = formDataArray.map(formData => formDataToWineInsert(formData, user.id));
+    const { data, error } = await supabase
+      .from('wines')
+      .insert(insertData)
+      .select();
+
+    if (error) throw new Error(error.message);
+
+    const newWines = (data || []).map(dbRowToWine);
+    setWines((prev: Wine[]) => [...newWines, ...prev]);
+    return newWines;
+  }, [user]);
+
   const updateWine = useCallback(async (wine: Wine) => {
     if (!user) throw new Error('Must be logged in to update wine');
 
@@ -212,7 +230,7 @@ export function WineProvider({ children }: { children: ReactNode }) {
   }, [wines]);
 
   return (
-    <WineContext.Provider value={{ wines, isLoading, addWine, updateWine, deleteWine, getWine, refreshWines }}>
+    <WineContext.Provider value={{ wines, isLoading, addWine, addWines, updateWine, deleteWine, getWine, refreshWines }}>
       {children}
     </WineContext.Provider>
   );

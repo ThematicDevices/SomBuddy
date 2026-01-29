@@ -5,6 +5,7 @@ import {
   Dashboard,
   Collection,
   AddWine,
+  BatchAddWines,
   WineDetail,
   Sommelier,
   Settings,
@@ -40,6 +41,7 @@ function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="collection" element={<Collection />} />
                   <Route path="add" element={<AddWine />} />
+                  <Route path="add/batch" element={<BatchAddWines />} />
                   <Route path="wine/:id" element={<WineDetail />} />
                   <Route path="sommelier" element={<Sommelier />} />
                   <Route path="restaurant" element={<RestaurantAdvisor />} />
