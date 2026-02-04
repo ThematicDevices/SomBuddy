@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-const BUCKET_NAME = 'wine-labels';
+const BUCKET_NAME = 'wine-images';
 
 export interface UploadResult {
   path: string;
