@@ -18,12 +18,12 @@ interface MigrationProgress {
 
 /**
  * Migrate wine images from base64 database storage to Supabase Storage
- * This utility processes wines in batches to avoid overwhelming the server
+ * This utility processes wines one by one to avoid timeouts
  */
 export async function migrateWineImages(
   userId: string,
   onProgress?: (progress: MigrationProgress) => void,
-  batchSize: number = 5
+  batchSize: number = 3
 ): Promise<MigrationProgress> {
   const progress: MigrationProgress = {
     total: 0,
@@ -33,103 +33,125 @@ export async function migrateWineImages(
     results: [],
   };
 
-  // Fetch all wines with base64 images that haven't been migrated yet
-  const { data: wines, error: fetchError } = await supabase
+  // Step 1: Get count and IDs only (fast query, no image data)
+  const { data: wineIds, error: countError } = await supabase
     .from('wines')
-    .select('id, label_image_url, label_image_storage_path')
+    .select('id')
     .eq('user_id', userId)
-    .not('label_image_url', 'is', null)
-    .is('label_image_storage_path', null);
+    .is('label_image_storage_path', null)
+    .limit(500); // Process max 500 at a time
 
-  if (fetchError) {
-    console.error('Error fetching wines for migration:', fetchError);
-    throw new Error(`Failed to fetch wines: ${fetchError.message}`);
+  if (countError) {
+    console.error('Error fetching wine IDs:', countError);
+    throw new Error(`Failed to fetch wines: ${countError.message}`);
   }
 
-  if (!wines || wines.length === 0) {
+  if (!wineIds || wineIds.length === 0) {
     return progress;
   }
 
-  progress.total = wines.length;
+  progress.total = wineIds.length;
   onProgress?.(progress);
 
-  // Process in batches
-  for (let i = 0; i < wines.length; i += batchSize) {
-    const batch = wines.slice(i, i + batchSize);
+  // Step 2: Process wines one by one, fetching image data individually
+  for (let i = 0; i < wineIds.length; i += batchSize) {
+    const batchIds = wineIds.slice(i, i + batchSize);
 
-    // Process batch in parallel
-    const batchResults = await Promise.all(
-      batch.map(async (wine: { id: string; label_image_url: string; label_image_storage_path: string | null }): Promise<MigrationResult> => {
-        try {
-          const base64Data = wine.label_image_url;
+    // Process batch sequentially to avoid overwhelming the server
+    for (const wineIdObj of batchIds) {
+      const wineId = wineIdObj.id;
 
-          // Skip if it's already a URL (not base64)
-          if (base64Data.startsWith('http')) {
-            return {
-              success: true,
-              wineId: wine.id,
-              storagePath: base64Data,
-            };
-          }
+      try {
+        // Fetch this wine's image data individually (much faster than bulk)
+        const { data: wine, error: fetchError } = await supabase
+          .from('wines')
+          .select('id, label_image_url')
+          .eq('id', wineId)
+          .eq('user_id', userId)
+          .single();
 
-          // Detect MIME type from base64 header or default to JPEG
-          let mimeType = 'image/jpeg';
-          if (base64Data.startsWith('/9j/')) {
-            mimeType = 'image/jpeg';
-          } else if (base64Data.startsWith('iVBORw0KGgo')) {
-            mimeType = 'image/png';
-          } else if (base64Data.startsWith('R0lGOD')) {
-            mimeType = 'image/gif';
-          } else if (base64Data.startsWith('UklGR')) {
-            mimeType = 'image/webp';
-          }
-
-          // Upload to Supabase Storage
-          const uploadResult = await uploadBase64Image(base64Data, userId, wine.id, mimeType);
-          const storagePath = uploadResult.path;
-
-          // Update the wine record with the storage path
-          const { error: updateError } = await supabase
-            .from('wines')
-            .update({ label_image_storage_path: storagePath })
-            .eq('id', wine.id)
-            .eq('user_id', userId);
-
-          if (updateError) {
-            throw new Error(updateError.message);
-          }
-
-          return {
-            success: true,
-            wineId: wine.id,
-            storagePath,
-          };
-        } catch (error) {
-          return {
-            success: false,
-            wineId: wine.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          };
+        if (fetchError) {
+          throw new Error(fetchError.message);
         }
-      })
-    );
 
-    // Update progress
-    for (const result of batchResults) {
-      progress.processed++;
-      if (result.success) {
+        const base64Data = wine?.label_image_url;
+
+        // Skip if no image data
+        if (!base64Data) {
+          progress.processed++;
+          progress.successful++;
+          progress.results.push({
+            success: true,
+            wineId,
+            storagePath: undefined,
+          });
+          onProgress?.(progress);
+          continue;
+        }
+
+        // Skip if it's already a URL (not base64)
+        if (base64Data.startsWith('http')) {
+          progress.processed++;
+          progress.successful++;
+          progress.results.push({
+            success: true,
+            wineId,
+            storagePath: base64Data,
+          });
+          onProgress?.(progress);
+          continue;
+        }
+
+        // Detect MIME type from base64 header
+        let mimeType = 'image/jpeg';
+        if (base64Data.startsWith('/9j/')) {
+          mimeType = 'image/jpeg';
+        } else if (base64Data.startsWith('iVBORw0KGgo')) {
+          mimeType = 'image/png';
+        } else if (base64Data.startsWith('R0lGOD')) {
+          mimeType = 'image/gif';
+        } else if (base64Data.startsWith('UklGR')) {
+          mimeType = 'image/webp';
+        }
+
+        // Upload to Supabase Storage
+        const uploadResult = await uploadBase64Image(base64Data, userId, wineId, mimeType);
+        const storagePath = uploadResult.path;
+
+        // Update the wine record with the storage path
+        const { error: updateError } = await supabase
+          .from('wines')
+          .update({ label_image_storage_path: storagePath })
+          .eq('id', wineId)
+          .eq('user_id', userId);
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+
+        progress.processed++;
         progress.successful++;
-      } else {
+        progress.results.push({
+          success: true,
+          wineId,
+          storagePath,
+        });
+      } catch (error) {
+        progress.processed++;
         progress.failed++;
+        progress.results.push({
+          success: false,
+          wineId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
       }
-      progress.results.push(result);
+
+      onProgress?.(progress);
     }
 
-    onProgress?.(progress);
-
     // Small delay between batches to avoid rate limiting
-    if (i + batchSize < wines.length) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    if (i + batchSize < wineIds.length) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
   }
 
