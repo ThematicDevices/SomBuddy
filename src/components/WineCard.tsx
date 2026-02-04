@@ -1,6 +1,6 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { Wine } from '../types';
+import { LazyImage } from './LazyImage';
 import {
   getWineDisplayName,
   getVarietalString,
@@ -55,17 +55,14 @@ export function WineCard({ wine, compact = false }: WineCardProps) {
       <div className="p-5">
         <div className="flex items-start gap-4">
           <div className="relative">
-            {wine.labelImageBase64 ? (
-              <img
-                src={`data:image/jpeg;base64,${wine.labelImageBase64}`}
-                alt={wine.producer}
-                className="w-16 h-24 object-cover rounded-lg shadow-sm"
-              />
-            ) : (
-              <div className={`w-16 h-24 rounded-lg flex items-center justify-center ${getWineColorClass(wine.wineColor)}`}>
-                <div className="w-6 h-12 bg-white/20 rounded-sm" />
-              </div>
-            )}
+            <LazyImage
+              src={wine.labelImageBase64 || wine.labelImageUrl}
+              alt={wine.producer}
+              className="w-16 h-24 rounded-lg shadow-sm"
+              placeholderClassName={getWineColorClass(wine.wineColor)}
+              thumbnailSize={{ width: 64, height: 96 }}
+              fallbackIcon={<div className="w-6 h-12 bg-white/20 rounded-sm" />}
+            />
             {wine.quantity > 1 && (
               <span className="absolute -top-2 -right-2 w-6 h-6 bg-wine-900 text-white text-xs font-bold rounded-full flex items-center justify-center">
                 {wine.quantity}
