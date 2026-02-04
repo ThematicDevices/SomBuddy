@@ -1,6 +1,17 @@
 export type DrinkingStatus = 'ready' | 'needs-aging' | 'past-peak' | 'unknown';
 export type BottleCondition = 'excellent' | 'good' | 'fair' | 'poor' | 'unknown';
 export type WineColor = 'red' | 'white' | 'rosé' | 'sparkling' | 'dessert' | 'fortified' | 'orange';
+export type BottleSize = '375ml' | '500ml' | '750ml' | '1L' | '1.5L' | '3L' | '5L';
+
+export const bottleSizeOptions: { value: BottleSize; label: string }[] = [
+  { value: '375ml', label: '375ml (Half Bottle)' },
+  { value: '500ml', label: '500ml' },
+  { value: '750ml', label: '750ml (Standard)' },
+  { value: '1L', label: '1L' },
+  { value: '1.5L', label: '1.5L (Magnum)' },
+  { value: '3L', label: '3L (Double Magnum)' },
+  { value: '5L', label: '5L (Jeroboam)' },
+];
 
 export interface VarietalBlend {
   varietal: string;
@@ -38,6 +49,7 @@ export interface Wine {
   appellation?: string;
   varietals: VarietalBlend[];
   wineColor: WineColor;
+  bottleSize?: BottleSize;
   alcoholContent?: number;
 
   purchaseDate?: string;
@@ -84,6 +96,7 @@ export interface WineFormData {
   appellation?: string;
   varietals: VarietalBlend[];
   wineColor: WineColor;
+  bottleSize?: BottleSize;
   alcoholContent?: number;
   quantity: number;
   purchasePrice?: number;
@@ -98,6 +111,7 @@ export interface WineFormData {
   labelImageBase64?: string;
   story?: string;
   tastingNotes?: TastingNote[];
+  isOpen?: boolean;
 }
 
 export const createDefaultWine = (): WineFormData => ({
@@ -108,6 +122,7 @@ export const createDefaultWine = (): WineFormData => ({
   country: '',
   varietals: [],
   wineColor: 'red',
+  bottleSize: '750ml',
   quantity: 1,
   pairingSuggestions: [],
 });

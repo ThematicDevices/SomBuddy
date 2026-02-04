@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { useWines } from '../contexts';
+import { useAllWines } from '../hooks/useWineQueries';
 import { getCollectionStats, formatPrice } from '../utils';
 import { WineCard } from '../components';
 import {
@@ -11,6 +12,9 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle,
+  Loader2,
+  GlassWater,
+  DollarSign,
 } from 'lucide-react';
 
 // Wine type color mapping for pie chart
@@ -26,7 +30,15 @@ const WINE_TYPE_COLORS: Record<string, string> = {
 const FALLBACK_COLORS = ['#722f37', '#ae214c', '#d02d5f', '#e44d77', '#ef7899', '#f6abbe'];
 
 export function Dashboard() {
-  const { wines } = useWines();
+  const { wines, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useAllWines();
+
+  // Automatically fetch all pages for accurate stats
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   const stats = getCollectionStats(wines);
 
   const colorData = Object.entries(stats.byColor).map(([name, value]) => ({ name, value }));
@@ -41,6 +53,22 @@ export function Dashboard() {
 
   const readyToDrink = stats.readyToDrink.slice(0, 3);
   const needsAttention = stats.pastPeak.slice(0, 3);
+
+  // Calculate opened bottles metrics
+  const openedBottlesStats = useMemo(() => {
+    const openBottles = wines.filter(w => w.isOpen);
+    const totalOpened = openBottles.length;
+    const totalValueConsumed = openBottles.reduce((sum, w) => sum + (w.purchasePrice || 0) * w.quantity, 0);
+    const recentlyOpened = openBottles
+      .sort((a, b) => new Date(b.dateModified).getTime() - new Date(a.dateModified).getTime())
+      .slice(0, 3);
+
+    return {
+      totalOpened,
+      totalValueConsumed,
+      recentlyOpened,
+    };
+  }, [wines]);
 
   if (wines.length === 0) {
     return (
@@ -148,6 +176,51 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Opened Bottles Metrics */}
+      {openedBottlesStats.totalOpened > 0 && (
+        <div className="bg-gradient-to-r from-wine-50 to-gold-50 rounded-xl border border-wine-100 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <GlassWater className="w-5 h-5 text-wine-700" />
+            <h3 className="font-semibold text-charcoal-900">Opened Bottles</h3>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-white/60 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <GlassWater className="w-4 h-4 text-wine-600" />
+                <p className="text-xs text-charcoal-500">Currently Open</p>
+              </div>
+              <p className="text-xl font-bold text-charcoal-900">{openedBottlesStats.totalOpened}</p>
+            </div>
+
+            <div className="bg-white/60 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="w-4 h-4 text-gold-600" />
+                <p className="text-xs text-charcoal-500">Value Consumed</p>
+              </div>
+              <p className="text-xl font-bold text-charcoal-900">{formatPrice(openedBottlesStats.totalValueConsumed)}</p>
+            </div>
+
+            {openedBottlesStats.recentlyOpened.length > 0 && (
+              <div className="col-span-2 md:col-span-1 bg-white/60 rounded-lg p-3">
+                <p className="text-xs text-charcoal-500 mb-2">Recently Opened</p>
+                <div className="space-y-1">
+                  {openedBottlesStats.recentlyOpened.map(wine => (
+                    <Link
+                      key={wine.id}
+                      to={`/wine/${wine.id}`}
+                      className="block text-sm text-charcoal-700 hover:text-wine-700 truncate"
+                    >
+                      {wine.vintage} {wine.producer}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {colorData.length > 0 && (

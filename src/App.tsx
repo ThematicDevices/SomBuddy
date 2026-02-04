@@ -15,6 +15,7 @@ import {
   Login,
   Signup,
   ForgotPassword,
+  ResetPassword,
   RestaurantAdvisor
 } from './pages';
 
@@ -33,6 +34,7 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
 
                   {/* Protected routes */}
                   <Route

@@ -13,6 +13,7 @@ export function formDataToWine(formData: WineFormData): Wine {
     appellation: formData.appellation,
     varietals: formData.varietals,
     wineColor: formData.wineColor,
+    bottleSize: formData.bottleSize || '750ml',
     alcoholContent: formData.alcoholContent,
     purchaseDate: formData.purchaseDate,
     purchasePrice: formData.purchasePrice,

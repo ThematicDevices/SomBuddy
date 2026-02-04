@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { WineFormData, wineColorOptions, commonVarietals, createDefaultWine } from '../types';
+import { WineFormData, wineColorOptions, bottleSizeOptions, commonVarietals, createDefaultWine } from '../types';
 import { Plus, X, ChevronDown } from 'lucide-react';
 
 interface WineFormProps {
@@ -315,6 +315,24 @@ export function WineForm({
 
         <div>
           <label className="block text-sm font-medium text-charcoal-700 mb-1">
+            Bottle Size
+          </label>
+          <div className="relative">
+            <select
+              value={formData.bottleSize || '750ml'}
+              onChange={e => updateField('bottleSize', e.target.value as WineFormData['bottleSize'])}
+              className="w-full px-3 py-2 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors appearance-none bg-white"
+            >
+              {bottleSizeOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-400 pointer-events-none" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-charcoal-700 mb-1">
             Purchase Price ($)
           </label>
           <input
@@ -327,7 +345,9 @@ export function WineForm({
             placeholder="e.g., 45.00"
           />
         </div>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-charcoal-700 mb-1">
             Purchase Date
@@ -339,9 +359,7 @@ export function WineForm({
             className="w-full px-3 py-2 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
           />
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-charcoal-700 mb-1">
             Purchased From
@@ -354,18 +372,34 @@ export function WineForm({
             placeholder="e.g., Wine.com, Local shop"
           />
         </div>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-charcoal-700 mb-1">
-            Storage Location
-          </label>
+      <div>
+        <label className="block text-sm font-medium text-charcoal-700 mb-1">
+          Storage Location
+        </label>
+        <input
+          type="text"
+          value={formData.storageLocation || ''}
+          onChange={e => updateField('storageLocation', e.target.value)}
+          className="w-full px-3 py-2 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
+          placeholder="e.g., Cellar - Rack A2"
+        />
+      </div>
+
+      <div className="flex items-center gap-3 p-4 bg-wine-50/50 rounded-lg border border-wine-100">
+        <label className="relative inline-flex items-center cursor-pointer">
           <input
-            type="text"
-            value={formData.storageLocation || ''}
-            onChange={e => updateField('storageLocation', e.target.value)}
-            className="w-full px-3 py-2 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
-            placeholder="e.g., Cellar - Rack A2"
+            type="checkbox"
+            checked={formData.isOpen || false}
+            onChange={e => updateField('isOpen', e.target.checked)}
+            className="sr-only peer"
           />
+          <div className="w-11 h-6 bg-charcoal-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-wine-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-charcoal-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-wine-700"></div>
+        </label>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-charcoal-800">Already Opened</p>
+          <p className="text-xs text-charcoal-500">Mark this bottle as currently open</p>
         </div>
       </div>
 
@@ -459,14 +493,15 @@ export function WineForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-charcoal-600 hover:text-charcoal-800 font-medium transition-colors"
+          disabled={isLoading}
+          className="px-4 py-2 text-charcoal-600 hover:text-charcoal-800 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isLoading}
-          className="px-6 py-2 bg-wine-900 hover:bg-wine-800 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="px-6 py-2 bg-wine-900 hover:bg-wine-800 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[180px] justify-center"
         >
           {isLoading && (
             <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />

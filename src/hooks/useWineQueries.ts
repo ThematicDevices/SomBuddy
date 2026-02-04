@@ -2,6 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { supabase } from '../lib/supabase';
 import { Wine, WineFormData } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadBase64Image } from '../utils/imageStorage';
 
 const PAGE_SIZE = 20;
 
@@ -18,6 +19,7 @@ function dbRowToWine(row: any): Wine {
     appellation: row.appellation,
     varietals: row.varietals || [],
     wineColor: row.wine_color,
+    bottleSize: row.bottle_size || '750ml',
     alcoholContent: row.alcohol_content,
     purchaseDate: row.purchase_date,
     purchasePrice: row.purchase_price,
@@ -60,6 +62,7 @@ function wineToDbRow(wine: Partial<Wine> & { id?: string }, userId: string) {
     appellation: wine.appellation || null,
     varietals: wine.varietals,
     wine_color: wine.wineColor,
+    bottle_size: wine.bottleSize || '750ml',
     alcohol_content: wine.alcoholContent || null,
     purchase_date: wine.purchaseDate || null,
     purchase_price: wine.purchasePrice || null,
@@ -86,7 +89,7 @@ function wineToDbRow(wine: Partial<Wine> & { id?: string }, userId: string) {
 // Columns to fetch for list view (excludes large image data, but includes storage path)
 const LIST_COLUMNS = `
   id, user_id, producer, wine_name, vintage, region, sub_region, country,
-  appellation, varietals, wine_color, alcohol_content, purchase_date,
+  appellation, varietals, wine_color, bottle_size, alcohol_content, purchase_date,
   purchase_price, purchased_from, estimated_value, quantity,
   storage_location, bottle_condition, tasting_notes, drinking_window_start,
   drinking_window_end, drinking_status, pairing_suggestions, personal_rating,
@@ -177,7 +180,7 @@ export function useWineDetail(wineId: string | undefined) {
 }
 
 /**
- * Hook to add a new wine
+ * Hook to add a new wine - uploads images to storage by default
  */
 export function useAddWine() {
   const { user } = useAuth();
@@ -187,6 +190,7 @@ export function useAddWine() {
     mutationFn: async (formData: WineFormData) => {
       if (!user) throw new Error('Not authenticated');
 
+      // First, insert the wine record (without image data to get the ID)
       const insertData = {
         user_id: user.id,
         producer: formData.producer,
@@ -198,6 +202,7 @@ export function useAddWine() {
         appellation: formData.appellation || null,
         varietals: formData.varietals,
         wine_color: formData.wineColor,
+        bottle_size: formData.bottleSize || '750ml',
         alcohol_content: formData.alcoholContent || null,
         purchase_date: formData.purchaseDate || null,
         purchase_price: formData.purchasePrice || null,
@@ -208,8 +213,11 @@ export function useAddWine() {
         drinking_window_end: formData.drinkingWindowEnd || null,
         why_purchased: formData.whyPurchased || null,
         pairing_suggestions: formData.pairingSuggestions || [],
-        label_image_url: formData.labelImageBase64 || null,
         story: formData.story || null,
+        is_open: formData.isOpen || false,
+        // Don't include base64 image yet - we'll upload to storage
+        label_image_url: null,
+        label_image_storage_path: null,
       };
 
       const { data, error } = await supabase
@@ -219,7 +227,50 @@ export function useAddWine() {
         .single();
 
       if (error) throw new Error(error.message);
-      return dbRowToWine(data);
+
+      let wine = dbRowToWine(data);
+
+      // If there's a base64 image, upload to storage
+      if (formData.labelImageBase64) {
+        try {
+          const result = await uploadBase64Image(
+            formData.labelImageBase64,
+            user.id,
+            wine.id,
+            'image/jpeg'
+          );
+
+          // Update the wine record with the storage path
+          const { error: updateError } = await supabase
+            .from('wines')
+            .update({ label_image_storage_path: result.path })
+            .eq('id', wine.id)
+            .eq('user_id', user.id);
+
+          if (updateError) {
+            console.error('Failed to update wine with storage path:', updateError);
+            // Fall back to storing base64 if storage update fails
+            await supabase
+              .from('wines')
+              .update({ label_image_url: formData.labelImageBase64 })
+              .eq('id', wine.id)
+              .eq('user_id', user.id);
+          } else {
+            wine = { ...wine, labelImageStoragePath: result.path };
+          }
+        } catch (uploadError) {
+          console.error('Failed to upload image to storage, falling back to base64:', uploadError);
+          // Fall back to storing base64 if upload fails
+          await supabase
+            .from('wines')
+            .update({ label_image_url: formData.labelImageBase64 })
+            .eq('id', wine.id)
+            .eq('user_id', user.id);
+          wine = { ...wine, labelImageBase64: formData.labelImageBase64 };
+        }
+      }
+
+      return wine;
     },
     onSuccess: () => {
       // Invalidate wine list to refetch
@@ -251,6 +302,7 @@ export function useAddWines() {
         appellation: formData.appellation || null,
         varietals: formData.varietals,
         wine_color: formData.wineColor,
+        bottle_size: formData.bottleSize || '750ml',
         alcohol_content: formData.alcoholContent || null,
         purchase_date: formData.purchaseDate || null,
         purchase_price: formData.purchasePrice || null,
@@ -262,6 +314,7 @@ export function useAddWines() {
         why_purchased: formData.whyPurchased || null,
         pairing_suggestions: formData.pairingSuggestions || [],
         label_image_url: formData.labelImageBase64 || null,
+        story: formData.story || null,
       }));
 
       const { data, error } = await supabase

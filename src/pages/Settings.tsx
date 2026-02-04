@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useToast } from '../contexts';
 import { MigrationSettings } from '../components';
+import { useRefreshWines } from '../hooks/useWineQueries';
 import { User, Mail, LogOut, Trash2, Download, Upload, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -9,10 +10,12 @@ export function Settings() {
   const navigate = useNavigate();
   const { user, profile, signOut, updateProfile } = useAuth();
   const { showToast } = useToast();
+  const refreshWines = useRefreshWines();
 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -69,36 +72,78 @@ export function Settings() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    setIsImporting(true);
+
     try {
       const text = await file.text();
       const data = JSON.parse(text);
 
       if (data.wines && Array.isArray(data.wines)) {
         let imported = 0;
+        let failed = 0;
+
         for (const wine of data.wines) {
-          const { error } = await supabase.from('wines').insert({
+          // Handle both snake_case (DB format) and camelCase (app format) field names
+          const insertData = {
             user_id: user.id,
-            producer: wine.producer || wine.producer,
+            producer: wine.producer,
             wine_name: wine.wine_name || wine.wineName || '',
             vintage: wine.vintage,
             region: wine.region || '',
+            sub_region: wine.sub_region || wine.subRegion || null,
             country: wine.country || '',
+            appellation: wine.appellation || null,
             varietals: wine.varietals || [],
             wine_color: wine.wine_color || wine.wineColor || 'red',
+            alcohol_content: wine.alcohol_content || wine.alcoholContent || null,
+            purchase_date: wine.purchase_date || wine.purchaseDate || null,
+            purchase_price: wine.purchase_price || wine.purchasePrice || null,
+            purchased_from: wine.purchased_from || wine.purchasedFrom || null,
+            estimated_value: wine.estimated_value || wine.estimatedValue || null,
             quantity: wine.quantity || 1,
+            storage_location: wine.storage_location || wine.storageLocation || null,
+            bottle_condition: wine.bottle_condition || wine.bottleCondition || 'unknown',
+            tasting_notes: wine.tasting_notes || wine.tastingNotes || [],
+            drinking_window_start: wine.drinking_window_start || wine.drinkingWindowStart || null,
+            drinking_window_end: wine.drinking_window_end || wine.drinkingWindowEnd || null,
+            drinking_status: wine.drinking_status || wine.drinkingStatus || 'unknown',
             pairing_suggestions: wine.pairing_suggestions || wine.pairingSuggestions || [],
-          });
+            personal_rating: wine.personal_rating || wine.personalRating || null,
+            is_open: wine.is_open || wine.isOpen || false,
+            why_purchased: wine.why_purchased || wine.whyPurchased || null,
+            provenance: wine.provenance || null,
+            story: wine.story || null,
+            label_image_url: wine.label_image_url || wine.labelImageUrl || wine.labelImageBase64 || null,
+            label_image_storage_path: wine.label_image_storage_path || wine.labelImageStoragePath || null,
+            consumption_history: wine.consumption_history || wine.consumptionHistory || [],
+          };
 
-          if (!error) imported++;
+          const { error } = await supabase.from('wines').insert(insertData);
+
+          if (!error) {
+            imported++;
+          } else {
+            console.error('Failed to import wine:', wine.producer, error);
+            failed++;
+          }
         }
 
-        showToast(`Imported ${imported} wines successfully`, 'success');
-        window.location.reload();
+        // Invalidate React Query cache to show new wines
+        refreshWines();
+
+        if (failed > 0) {
+          showToast(`Imported ${imported} wines (${failed} failed)`, 'info');
+        } else {
+          showToast(`Imported ${imported} wines successfully!`, 'success');
+        }
       } else {
-        showToast('Invalid import file format', 'error');
+        showToast('Invalid import file format. Expected { wines: [...] }', 'error');
       }
     } catch (error) {
-      showToast('Failed to import data', 'error');
+      console.error('Import error:', error);
+      showToast('Failed to import data. Check file format.', 'error');
+    } finally {
+      setIsImporting(false);
     }
 
     e.target.value = '';

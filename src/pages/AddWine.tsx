@@ -115,13 +115,19 @@ export function AddWine() {
     }
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (data: WineFormData) => {
+    if (isSubmitting) return; // Prevent double submission
+
+    setIsSubmitting(true);
     try {
       const wine = await addWineMutation.mutateAsync(data);
       showToast(`${wine.producer} ${wine.wineName || ''} added to your collection!`, 'success');
       navigate(`/wine/${wine.id}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to add wine', 'error');
+      setIsSubmitting(false);
     }
   };
 
@@ -269,7 +275,8 @@ export function AddWine() {
             initialData={extractedData || undefined}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
-            submitLabel="Add to Collection"
+            submitLabel={isSubmitting ? "Adding to Collection..." : "Add to Collection"}
+            isLoading={isSubmitting}
           />
         </div>
       )}
@@ -311,7 +318,8 @@ export function AddWine() {
             initialData={manualFormData}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
-            submitLabel="Add to Collection"
+            submitLabel={isSubmitting ? "Adding to Collection..." : "Add to Collection"}
+            isLoading={isSubmitting}
             onFormChange={setManualFormData}
           />
         </div>
