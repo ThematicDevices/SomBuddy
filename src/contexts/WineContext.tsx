@@ -11,6 +11,7 @@ interface WineContextType {
   updateWine: (wine: Wine) => Promise<void>;
   deleteWine: (wineId: string) => Promise<void>;
   getWine: (wineId: string) => Wine | undefined;
+  fetchWineWithImage: (wineId: string) => Promise<Wine | null>;
   refreshWines: () => Promise<void>;
 }
 
@@ -113,11 +114,22 @@ export function WineProvider({ children }: { children: ReactNode }) {
 
     setIsLoading(true);
     try {
+      // Select all columns EXCEPT label_image_url to avoid fetching large base64 data
+      // This significantly improves query performance and prevents timeouts
       const { data, error } = await supabase
         .from('wines')
-        .select('*')
+        .select(`
+          id, user_id, producer, wine_name, vintage, region, sub_region, country,
+          appellation, varietals, wine_color, alcohol_content, purchase_date,
+          purchase_price, purchased_from, estimated_value, quantity,
+          storage_location, bottle_condition, tasting_notes, drinking_window_start,
+          drinking_window_end, drinking_status, pairing_suggestions, personal_rating,
+          is_open, why_purchased, provenance, story, consumption_history,
+          created_at, updated_at
+        `)
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       // Check if the request was aborted before updating state
       if (signal?.aborted) return;
@@ -249,8 +261,40 @@ export function WineProvider({ children }: { children: ReactNode }) {
     return wines.find((w: Wine) => w.id === wineId);
   }, [wines]);
 
+  // Fetch a single wine with full data including the label image
+  // This is used when viewing wine details to avoid fetching all images in the list
+  const fetchWineWithImage = useCallback(async (wineId: string): Promise<Wine | null> => {
+    if (!user) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('wines')
+        .select('*')
+        .eq('id', wineId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching wine with image:', error);
+        return null;
+      }
+
+      const fullWine = dbRowToWine(data);
+
+      // Update the wine in state with the full data including image
+      setWines((prev: Wine[]) => prev.map((w: Wine) =>
+        w.id === wineId ? fullWine : w
+      ));
+
+      return fullWine;
+    } catch (error) {
+      console.error('Error fetching wine with image:', error);
+      return null;
+    }
+  }, [user]);
+
   return (
-    <WineContext.Provider value={{ wines, isLoading, addWine, addWines, updateWine, deleteWine, getWine, refreshWines }}>
+    <WineContext.Provider value={{ wines, isLoading, addWine, addWines, updateWine, deleteWine, getWine, fetchWineWithImage, refreshWines }}>
       {children}
     </WineContext.Provider>
   );

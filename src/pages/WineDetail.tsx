@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useWines, useToast } from '../contexts';
 import { Modal, WineForm } from '../components';
-import { WineFormData, TastingNote } from '../types';
+import { WineFormData, TastingNote, Wine } from '../types';
 import {
   getWineDisplayName,
   getVarietalString,
@@ -36,10 +36,15 @@ import {
 export function WineDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getWine, updateWine, deleteWine } = useWines();
+  const { getWine, fetchWineWithImage, updateWine, deleteWine } = useWines();
   const { showToast } = useToast();
 
-  const wine = getWine(id || '');
+  // Get wine from context (may not have image initially)
+  const wineFromContext = getWine(id || '');
+
+  // Local state for wine with full data including image
+  const [wine, setWine] = useState<Wine | null>(wineFromContext || null);
+  const [isLoadingImage, setIsLoadingImage] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -48,6 +53,27 @@ export function WineDetail() {
   const [tastingNotes, setTastingNotes] = useState('');
   const [tastingRating, setTastingRating] = useState<number>(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Sync with context when it updates
+  useEffect(() => {
+    if (wineFromContext) {
+      setWine(wineFromContext);
+    }
+  }, [wineFromContext]);
+
+  // Fetch full wine data including image when component mounts
+  useEffect(() => {
+    if (id && wine && !wine.labelImageBase64) {
+      setIsLoadingImage(true);
+      fetchWineWithImage(id)
+        .then((fullWine) => {
+          if (fullWine) {
+            setWine(fullWine);
+          }
+        })
+        .finally(() => setIsLoadingImage(false));
+    }
+  }, [id, wine?.id, fetchWineWithImage]);
 
   if (!wine) {
     return (
