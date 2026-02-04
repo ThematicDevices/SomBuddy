@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useWines, useToast } from '../contexts';
+import { useToast } from '../contexts';
 import { Modal, WineForm } from '../components';
-import { WineFormData, TastingNote, Wine } from '../types';
+import { WineFormData, TastingNote } from '../types';
+import { useWineDetail, useUpdateWine, useDeleteWine } from '../hooks/useWineQueries';
 import {
   getWineDisplayName,
   getVarietalString,
@@ -36,15 +37,12 @@ import {
 export function WineDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getWine, fetchWineWithImage, updateWine, deleteWine } = useWines();
   const { showToast } = useToast();
 
-  // Get wine from context (may not have image initially)
-  const wineFromContext = getWine(id || '');
-
-  // Local state for wine with full data including image
-  const [wine, setWine] = useState<Wine | null>(wineFromContext || null);
-  const [isLoadingImage, setIsLoadingImage] = useState(false);
+  // React Query hooks
+  const { data: wine, isLoading, error } = useWineDetail(id);
+  const updateWineMutation = useUpdateWine();
+  const deleteWineMutation = useDeleteWine();
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -54,28 +52,18 @@ export function WineDetail() {
   const [tastingRating, setTastingRating] = useState<number>(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Sync with context when it updates
-  useEffect(() => {
-    if (wineFromContext) {
-      setWine(wineFromContext);
-    }
-  }, [wineFromContext]);
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <Loader2 className="w-12 h-12 text-wine-500 animate-spin mb-4" />
+        <p className="text-charcoal-500">Loading wine details...</p>
+      </div>
+    );
+  }
 
-  // Fetch full wine data including image when component mounts
-  useEffect(() => {
-    if (id && wine && !wine.labelImageBase64) {
-      setIsLoadingImage(true);
-      fetchWineWithImage(id)
-        .then((fullWine) => {
-          if (fullWine) {
-            setWine(fullWine);
-          }
-        })
-        .finally(() => setIsLoadingImage(false));
-    }
-  }, [id, wine?.id, fetchWineWithImage]);
-
-  if (!wine) {
+  // Error state
+  if (error || !wine) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <WineIcon className="w-16 h-16 text-charcoal-300 mb-4" />
@@ -96,7 +84,7 @@ export function WineDetail() {
 
   const handleEdit = async (data: WineFormData) => {
     try {
-      await updateWine({
+      await updateWineMutation.mutateAsync({
         ...wine,
         ...data,
         dateModified: new Date().toISOString(),
@@ -110,7 +98,7 @@ export function WineDetail() {
 
   const handleDelete = async () => {
     try {
-      await deleteWine(wine.id);
+      await deleteWineMutation.mutateAsync(wine.id);
       showToast('Wine removed from collection', 'info');
       navigate('/collection');
     } catch (err) {
@@ -130,7 +118,7 @@ export function WineDetail() {
     };
 
     try {
-      await updateWine({
+      await updateWineMutation.mutateAsync({
         ...wine,
         quantity: wine.quantity - 1,
         tastingNotes: [...wine.tastingNotes, newNote],
@@ -155,7 +143,7 @@ export function WineDetail() {
     };
 
     try {
-      await updateWine({
+      await updateWineMutation.mutateAsync({
         ...wine,
         tastingNotes: [...wine.tastingNotes, newNote],
       });
@@ -171,7 +159,7 @@ export function WineDetail() {
 
   const handleDeleteTastingNote = async (noteId: string) => {
     try {
-      await updateWine({
+      await updateWineMutation.mutateAsync({
         ...wine,
         tastingNotes: wine.tastingNotes.filter(n => n.id !== noteId),
       });
@@ -184,7 +172,7 @@ export function WineDetail() {
   const handleQuantityChange = async (delta: number) => {
     const newQuantity = Math.max(0, wine.quantity + delta);
     try {
-      await updateWine({ ...wine, quantity: newQuantity });
+      await updateWineMutation.mutateAsync({ ...wine, quantity: newQuantity });
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update quantity', 'error');
     }
@@ -202,18 +190,14 @@ export function WineDetail() {
         varietals: wine.varietals,
       });
 
-      await updateWine({
+      await updateWineMutation.mutateAsync({
         ...wine,
-        // Update market value with new estimated price
         estimatedValue: enrichedData.estimatedPrice,
-        // Update drinking window if provided
         drinkingWindowStart: enrichedData.drinkingWindowStart || wine.drinkingWindowStart,
         drinkingWindowEnd: enrichedData.drinkingWindowEnd || wine.drinkingWindowEnd,
-        // Update pairing suggestions if provided
         pairingSuggestions: enrichedData.pairingSuggestions?.length
           ? enrichedData.pairingSuggestions
           : wine.pairingSuggestions,
-        // Update story if provided and richer
         story: enrichedData.story || wine.story,
         dateModified: new Date().toISOString(),
       });

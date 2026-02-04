@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useWines } from '../contexts';
-import { WineCard } from '../components';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useAllWines } from '../hooks/useWineQueries';
+import { WineCard, WineCardSkeletonList } from '../components';
 import { searchWines, filterWines } from '../utils';
 import { DrinkingStatus, WineColor, wineColorOptions } from '../types';
-import { Search, SlidersHorizontal, X, Wine, PlusCircle } from 'lucide-react';
+import { Search, SlidersHorizontal, X, Wine, PlusCircle, Loader2, ChevronDown } from 'lucide-react';
 
 export function Collection() {
-  const { wines } = useWines();
+  const { wines, isLoading, isFetching, hasNextPage, fetchNextPage, totalCount } = useAllWines();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
@@ -20,6 +21,9 @@ export function Collection() {
     region: searchParams.get('region') || undefined,
     varietal: searchParams.get('varietal') || undefined,
   });
+
+  // Virtual scrolling container ref
+  const parentRef = useRef<HTMLDivElement>(null);
 
   const filteredWines = useMemo(() => {
     let result = wines;
@@ -62,6 +66,45 @@ export function Collection() {
 
   const hasActiveFilters = Object.values(filters).some(v => v !== undefined) || searchQuery;
 
+  // Virtual list setup - 2 columns on desktop, 1 on mobile
+  const rowVirtualizer = useVirtualizer({
+    count: Math.ceil(filteredWines.length / 2),
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 140, // Estimated row height
+    overscan: 3,
+  });
+
+  // Load more when scrolled near bottom
+  useEffect(() => {
+    const lastItem = rowVirtualizer.getVirtualItems().at(-1);
+    const totalRows = Math.ceil(filteredWines.length / 2);
+
+    if (
+      lastItem &&
+      lastItem.index >= totalRows - 3 &&
+      hasNextPage &&
+      !isFetching
+    ) {
+      fetchNextPage();
+    }
+  }, [rowVirtualizer.getVirtualItems(), hasNextPage, isFetching, fetchNextPage, filteredWines.length]);
+
+  // Show loading state on initial load
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-display font-bold text-charcoal-900">Wine Collection</h1>
+            <p className="text-charcoal-500">Loading your wines...</p>
+          </div>
+        </div>
+        <WineCardSkeletonList count={6} />
+      </div>
+    );
+  }
+
+  // Show empty state
   if (wines.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
@@ -91,7 +134,8 @@ export function Collection() {
         <div>
           <h1 className="text-2xl font-display font-bold text-charcoal-900">Wine Collection</h1>
           <p className="text-charcoal-500">
-            {filteredWines.length} of {wines.length} wines
+            {filteredWines.length} of {totalCount} wines
+            {isFetching && <span className="ml-2 text-wine-600">• Syncing...</span>}
           </p>
         </div>
         <Link
@@ -237,11 +281,65 @@ export function Collection() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredWines.map(wine => (
-            <WineCard key={wine.id} wine={wine} />
-          ))}
-        </div>
+        <>
+          {/* Virtual scrolling container */}
+          <div
+            ref={parentRef}
+            className="h-[calc(100vh-20rem)] overflow-auto"
+            style={{ contain: 'strict' }}
+          >
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const startIndex = virtualRow.index * 2;
+                const wine1 = filteredWines[startIndex];
+                const wine2 = filteredWines[startIndex + 1];
+
+                return (
+                  <div
+                    key={virtualRow.key}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+                      {wine1 && <WineCard key={wine1.id} wine={wine1} />}
+                      {wine2 && <WineCard key={wine2.id} wine={wine2} />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Load more indicator */}
+          {hasNextPage && (
+            <div className="flex justify-center py-4">
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetching}
+                className="flex items-center gap-2 px-4 py-2 text-wine-700 hover:text-wine-900 font-medium disabled:opacity-50"
+              >
+                {isFetching ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+                Load More
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

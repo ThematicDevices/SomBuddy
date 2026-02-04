@@ -4,7 +4,8 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Plus, Trash2, Edit3, Wine, AlertCi
 import { MultiImageUpload, ImageItem } from '../components/MultiImageUpload';
 import { BatchProcessingQueue } from '../components/BatchProcessingQueue';
 import { useBatchProcessor } from '../hooks/useBatchProcessor';
-import { useWines, useToast } from '../contexts';
+import { useToast } from '../contexts';
+import { useAddWine } from '../hooks/useWineQueries';
 import { WineFormData, createDefaultWine } from '../types';
 
 type BatchStep = 'select' | 'process' | 'review';
@@ -20,7 +21,7 @@ interface ReviewItem {
 
 export function BatchAddWines() {
   const navigate = useNavigate();
-  const { addWine } = useWines();
+  const addWineMutation = useAddWine();
   const { showToast } = useToast();
 
   const [step, setStep] = useState<BatchStep>('select');
@@ -97,7 +98,7 @@ export function BatchAddWines() {
           ...createDefaultWine(),
           ...item.data,
         };
-        await addWine(formData);
+        await addWineMutation.mutateAsync(formData);
 
         // Mark as added
         setReviewItems((prev) =>
@@ -143,7 +144,7 @@ export function BatchAddWines() {
           ...createDefaultWine(),
           ...item.data,
         };
-        await addWine(formData);
+        await addWineMutation.mutateAsync(formData);
         addedCount++;
 
         // Mark as added

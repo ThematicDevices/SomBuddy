@@ -11,3 +11,5 @@ export { BatchProcessingQueue } from './BatchProcessingQueue';
 export { ProtectedRoute } from './ProtectedRoute';
 export { WineListInput } from './WineListInput';
 export { RecommendationCard } from './RecommendationCard';
+export { WineCardSkeleton, WineCardSkeletonList } from './WineCardSkeleton';
+export { LazyImage } from './LazyImage';

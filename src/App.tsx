@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { WineProvider, AuthProvider, ToastProvider, ChatProvider, ApiKeyProvider } from './contexts';
 import { Layout, ProtectedRoute, ErrorBoundary } from './components';
 import {
@@ -19,12 +21,13 @@ import {
 function App() {
   return (
     <ErrorBoundary>
-      <ToastProvider>
-        <AuthProvider>
-          <ApiKeyProvider>
-            <WineProvider>
-              <ChatProvider>
-                <BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <AuthProvider>
+            <ApiKeyProvider>
+              <WineProvider>
+                <ChatProvider>
+                  <BrowserRouter>
                 <Routes>
                   {/* Public routes */}
                   <Route path="/login" element={<Login />} />
@@ -57,6 +60,7 @@ function App() {
           </ApiKeyProvider>
         </AuthProvider>
       </ToastProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

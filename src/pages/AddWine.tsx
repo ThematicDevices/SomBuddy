@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ImageUpload, WineForm } from '../components';
-import { useWines, useToast } from '../contexts';
+import { useToast } from '../contexts';
+import { useAddWine } from '../hooks/useWineQueries';
 import { extractWineFromImage, enrichWineData } from '../utils';
 import { WineFormData, createDefaultWine } from '../types';
 import { Camera, Edit3, AlertCircle, Sparkles, Loader2, Layers } from 'lucide-react';
@@ -10,7 +11,7 @@ type AddStep = 'choose' | 'photo' | 'validate' | 'manual';
 
 export function AddWine() {
   const navigate = useNavigate();
-  const { addWine } = useWines();
+  const addWineMutation = useAddWine();
   const { showToast } = useToast();
 
   const [step, setStep] = useState<AddStep>('choose');
@@ -116,7 +117,7 @@ export function AddWine() {
 
   const handleSubmit = async (data: WineFormData) => {
     try {
-      const wine = await addWine(data);
+      const wine = await addWineMutation.mutateAsync(data);
       showToast(`${wine.producer} ${wine.wineName || ''} added to your collection!`, 'success');
       navigate(`/wine/${wine.id}`);
     } catch (err) {
