@@ -125,18 +125,30 @@ export function isStorageUrl(str: string | null | undefined): boolean {
 }
 
 /**
- * Get the display URL for a wine image (handles both base64 and storage URLs)
+ * Get the display URL for a wine image
+ * Priority: Storage URL > Base64 data URL
+ * @param storagePath - The storage path (if migrated)
+ * @param base64Data - The base64 image data (legacy)
+ * @param useThumbnail - Whether to use thumbnail transformation
  */
 export function getWineImageDisplayUrl(
   imageData: string | null | undefined,
-  useThumbnail = false
+  useThumbnail = false,
+  storagePath?: string | null
 ): string | null {
+  // Priority 1: If storage path is provided, use storage URL
+  if (storagePath) {
+    if (useThumbnail) {
+      return getThumbnailUrl(storagePath, 128, 192);
+    }
+    return getImageUrl(storagePath);
+  }
+
+  // Priority 2: Handle imageData (could be base64 or legacy URL)
   if (!imageData) return null;
 
-  // If it's already a URL (storage), return as-is or get thumbnail
+  // If it's already a storage URL, return as-is or get thumbnail
   if (isStorageUrl(imageData)) {
-    // Extract path from full URL and get thumbnail if requested
-    // For now, just return the URL as-is
     return imageData;
   }
 

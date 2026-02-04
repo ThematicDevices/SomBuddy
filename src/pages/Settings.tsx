@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useToast } from '../contexts';
+import { MigrationSettings } from '../components';
 import { User, Mail, LogOut, Trash2, Download, Upload, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -197,6 +198,9 @@ export function Settings() {
           </button>
         </form>
       </div>
+
+      {/* Image Storage Migration */}
+      <MigrationSettings />
 
       {/* Data Management */}
       <div className="bg-white rounded-xl border border-charcoal-100 overflow-hidden">

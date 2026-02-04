@@ -8,6 +8,7 @@ interface LazyImageProps {
   placeholderClassName?: string;
   fallbackIcon?: React.ReactNode;
   thumbnailSize?: { width: number; height: number };
+  storagePath?: string | null;
 }
 
 // Simple in-memory cache for loaded images
@@ -20,13 +21,16 @@ export function LazyImage({
   placeholderClassName = 'bg-charcoal-200',
   fallbackIcon,
   thumbnailSize,
+  storagePath,
 }: LazyImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
 
-  const imageUrl = getWineImageDisplayUrl(src);
+  // Use storage path if available (for migrated images), otherwise fall back to base64
+  const useThumbnail = !!storagePath && !!thumbnailSize;
+  const imageUrl = getWineImageDisplayUrl(src, useThumbnail, storagePath);
 
   // Check if image is already in cache
   useEffect(() => {

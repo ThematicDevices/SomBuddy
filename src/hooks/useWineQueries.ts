@@ -40,6 +40,7 @@ function dbRowToWine(row: any): Wine {
     story: row.story,
     labelImageUrl: row.label_image_url,
     labelImageBase64: row.label_image_url,
+    labelImageStoragePath: row.label_image_storage_path,
     dateAdded: row.created_at,
     dateModified: row.updated_at,
     consumptionHistory: row.consumption_history || [],
@@ -82,7 +83,7 @@ function wineToDbRow(wine: Partial<Wine> & { id?: string }, userId: string) {
   };
 }
 
-// Columns to fetch for list view (excludes large image data)
+// Columns to fetch for list view (excludes large image data, but includes storage path)
 const LIST_COLUMNS = `
   id, user_id, producer, wine_name, vintage, region, sub_region, country,
   appellation, varietals, wine_color, alcohol_content, purchase_date,
@@ -90,7 +91,7 @@ const LIST_COLUMNS = `
   storage_location, bottle_condition, tasting_notes, drinking_window_start,
   drinking_window_end, drinking_status, pairing_suggestions, personal_rating,
   is_open, why_purchased, provenance, story, consumption_history,
-  created_at, updated_at
+  created_at, updated_at, label_image_storage_path
 `;
 
 /**

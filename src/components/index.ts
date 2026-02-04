@@ -13,3 +13,4 @@ export { WineListInput } from './WineListInput';
 export { RecommendationCard } from './RecommendationCard';
 export { WineCardSkeleton, WineCardSkeletonList } from './WineCardSkeleton';
 export { LazyImage } from './LazyImage';
+export { MigrationSettings } from './MigrationSettings';

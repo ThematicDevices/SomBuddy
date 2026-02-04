@@ -61,6 +61,7 @@ export function WineCard({ wine, compact = false }: WineCardProps) {
               className="w-16 h-24 rounded-lg shadow-sm"
               placeholderClassName={getWineColorClass(wine.wineColor)}
               thumbnailSize={{ width: 64, height: 96 }}
+              storagePath={wine.labelImageStoragePath}
               fallbackIcon={<div className="w-6 h-12 bg-white/20 rounded-sm" />}
             />
             {wine.quantity > 1 && (

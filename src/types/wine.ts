@@ -66,6 +66,7 @@ export interface Wine {
   story?: string;
   labelImageUrl?: string;
   labelImageBase64?: string;
+  labelImageStoragePath?: string;
 
   dateAdded: string;
   dateModified: string;
