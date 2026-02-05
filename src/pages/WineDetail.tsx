@@ -15,6 +15,7 @@ import {
   calculateDrinkingStatus,
   enrichWineData,
 } from '../utils';
+import { getWineImageDisplayUrl } from '../utils/imageStorage';
 import {
   ArrowLeft,
   Edit3,
@@ -225,9 +226,9 @@ export function WineDetail() {
         <div className="p-6 md:p-8">
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex-shrink-0">
-              {wine.labelImageBase64 ? (
+              {(wine.labelImageStoragePath || wine.labelImageBase64) ? (
                 <img
-                  src={`data:image/jpeg;base64,${wine.labelImageBase64}`}
+                  src={getWineImageDisplayUrl(wine.labelImageBase64, false, wine.labelImageStoragePath) || ''}
                   alt={wine.producer}
                   className="w-32 h-48 md:w-40 md:h-56 object-cover rounded-lg shadow-md mx-auto md:mx-0"
                 />

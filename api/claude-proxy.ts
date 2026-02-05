@@ -95,8 +95,96 @@ const WINE_EXTRACTION_SCHEMA = `{
   "pairingSuggestions": ["grilled ribeye steak", "aged hard cheeses", "lamb chops"],
   "wineStyle": "Full-bodied, oak-aged red with aging potential",
   "criticScores": "Wine Advocate: 94, Wine Spectator: 92",
-  "story": "Brief background about the producer or wine's significance"
+  "story": "Brief background about the producer or wine's significance",
+  "confidence": 0.85
 }`;
+
+// Few-shot examples for wine extraction
+const WINE_EXTRACTION_EXAMPLES = `
+EXAMPLE 1 - Clear Label:
+Input: Photo shows "CAYMUS CABERNET SAUVIGNON 2019 NAPA VALLEY"
+Output: {
+  "producer": "Caymus Vineyards",
+  "wineName": "Cabernet Sauvignon",
+  "vintage": 2019,
+  "region": "Napa Valley",
+  "subRegion": null,
+  "country": "USA",
+  "appellation": "Napa Valley AVA",
+  "varietals": [{"varietal": "Cabernet Sauvignon", "percentage": 100}],
+  "wineColor": "red",
+  "alcoholContent": 14.6,
+  "estimatedPrice": 85.00,
+  "tastingNotes": [
+    {"category": "Aroma", "notes": "ripe dark cherry, cassis, cocoa, vanilla"},
+    {"category": "Palate", "notes": "rich and velvety, dark fruit, soft tannins, long finish"},
+    {"category": "Appearance", "notes": "deep garnet with purple rim"}
+  ],
+  "drinkingWindowStart": 2022,
+  "drinkingWindowEnd": 2032,
+  "pairingSuggestions": ["grilled ribeye", "braised short ribs", "aged cheddar"],
+  "wineStyle": "Full-bodied, fruit-forward Napa Cabernet",
+  "criticScores": "Wine Advocate: 93",
+  "story": "Founded in 1972 by Chuck Wagner, Caymus is known for its rich, approachable Cabernet Sauvignon.",
+  "confidence": 0.95
+}
+
+EXAMPLE 2 - Non-Vintage (NV) Wine:
+Input: Photo shows "VEUVE CLICQUOT BRUT YELLOW LABEL CHAMPAGNE" (no year visible)
+Output: {
+  "producer": "Veuve Clicquot",
+  "wineName": "Brut Yellow Label",
+  "vintage": null,
+  "region": "Champagne",
+  "subRegion": null,
+  "country": "France",
+  "appellation": "AOC Champagne",
+  "varietals": [{"varietal": "Pinot Noir", "percentage": 50}, {"varietal": "Chardonnay", "percentage": 28}, {"varietal": "Pinot Meunier", "percentage": 22}],
+  "wineColor": "sparkling",
+  "alcoholContent": 12.0,
+  "estimatedPrice": 55.00,
+  "tastingNotes": [
+    {"category": "Aroma", "notes": "apple, pear, brioche, light citrus"},
+    {"category": "Palate", "notes": "balanced acidity, fine bubbles, toasty notes"},
+    {"category": "Appearance", "notes": "golden yellow with persistent fine bubbles"}
+  ],
+  "drinkingWindowStart": 2024,
+  "drinkingWindowEnd": 2027,
+  "pairingSuggestions": ["oysters", "sushi", "brie cheese", "smoked salmon"],
+  "wineStyle": "Classic brut champagne with freshness and depth",
+  "criticScores": null,
+  "story": "One of the most recognized Champagne houses, founded in 1772, famous for its distinctive yellow label.",
+  "confidence": 0.98
+}
+
+EXAMPLE 3 - Blurry/Partial Label:
+Input: Photo shows blurry label with "...ROS...2021...PROVENC..." visible
+Output: {
+  "producer": null,
+  "wineName": "Rosé de Provence",
+  "vintage": 2021,
+  "region": "Provence",
+  "subRegion": null,
+  "country": "France",
+  "appellation": "Côtes de Provence AOC",
+  "varietals": [{"varietal": "Grenache", "percentage": 45}, {"varietal": "Cinsault", "percentage": 30}, {"varietal": "Syrah", "percentage": 25}],
+  "wineColor": "rosé",
+  "alcoholContent": 13.0,
+  "estimatedPrice": 18.00,
+  "tastingNotes": [
+    {"category": "Aroma", "notes": "strawberry, peach, citrus"},
+    {"category": "Palate", "notes": "dry, refreshing, mineral finish"},
+    {"category": "Appearance", "notes": "pale salmon pink"}
+  ],
+  "drinkingWindowStart": 2021,
+  "drinkingWindowEnd": 2024,
+  "pairingSuggestions": ["grilled fish", "salads", "Mediterranean dishes"],
+  "wineStyle": "Classic dry Provence rosé",
+  "criticScores": null,
+  "story": "Provence is renowned for producing some of the world's finest rosé wines.",
+  "confidence": 0.55
+}
+`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS preflight
@@ -136,16 +224,52 @@ Based on the wine label AND your expert knowledge, provide comprehensive informa
 - Food pairing suggestions
 - Any notable critic scores you're aware of
 - Brief story or background about the producer/wine
+- Confidence score (0.0 to 1.0) indicating how certain you are about the extraction
+
+FIELD-SPECIFIC GUIDELINES:
+
+PRODUCER: The winery or estate name. Look for prominent branding on the label. Examples: "Château Margaux", "Caymus Vineyards", "Penfolds".
+
+WINE NAME: The specific wine name or cuvée, if different from producer. Examples: "Grand Vin", "Special Selection", "Grange". If the wine is just named by varietal/region, use that (e.g., "Chardonnay" or "Châteauneuf-du-Pape").
+
+VINTAGE: The harvest year. If no year is visible, this is likely a Non-Vintage (NV) wine - set vintage to null. Common for Champagne, Port, and some sparkling wines.
+
+REGION/COUNTRY: Identify from text on label or from your knowledge. Examples: "Napa Valley, USA", "Bordeaux, France", "Barossa Valley, Australia".
+
+VARIETALS: List grape varieties with percentages if known. For single varietals, use 100%. For blends, estimate typical percentages for that wine style if not shown.
+
+WINE COLOR: Must be one of: red, white, rosé, sparkling, dessert, fortified, orange
+
+DRINKING WINDOW:
+- Light whites/rosés: drink within 1-3 years
+- Full-bodied whites: 3-10 years
+- Light reds: 2-5 years
+- Full-bodied reds: 5-15+ years
+- Fine Bordeaux/Burgundy: 10-30+ years
+- Start year = when wine becomes enjoyable, End year = when it will likely decline
+
+PRICE ESTIMATION:
+- Entry-level: $8-20
+- Mid-range: $20-50
+- Premium: $50-100
+- Luxury: $100-250
+- Icon/Collector: $250+
+
+CONFIDENCE SCORE:
+- 0.9-1.0: Label is clear, well-known wine, high certainty
+- 0.7-0.89: Most fields readable, some estimation needed
+- 0.5-0.69: Label partially readable, significant estimation
+- Below 0.5: Poor image quality, many fields uncertain
+
+${WINE_EXTRACTION_EXAMPLES}
 
 Always respond with valid JSON in this exact format:
 ${WINE_EXTRACTION_SCHEMA}
 
-IMPORTANT GUIDELINES:
-- For drinking windows, consider the vintage year and wine style. Young everyday wines might be "drink now to +3 years", while fine wines could age 10-30+ years.
-- Estimate prices realistically based on region, producer reputation, and quality tier.
+IMPORTANT:
 - If any field cannot be determined, use null for numbers, empty string for strings, or empty array for arrays.
 - Be specific with tasting notes based on the grape varieties and region.
-- For varietals, if it's a blend and percentages aren't shown, estimate typical percentages for that wine style.`;
+- Always include a confidence score reflecting your certainty about the extraction.`;
 
       messages = [
         {
@@ -245,13 +369,19 @@ IMPORTANT:
       const { restaurantName, corkageFee, wineListImage, wineListMimeType, wineListText, mealDescription } = req.body as RequestBody;
       const currentYear = new Date().getFullYear();
 
-      const winesSummary = (wines || []).map((w) => {
+      // Limit wines to reduce payload size and processing time (top 100 by value/relevance)
+      const limitedWines = (wines || [])
+        .sort((a, b) => (b.purchasePrice || 0) - (a.purchasePrice || 0))
+        .slice(0, 100);
+
+      const winesSummary = limitedWines.map((w) => {
         const drinkingInfo = w.drinkingWindowStart && w.drinkingWindowEnd
-          ? `drinking window: ${w.drinkingWindowStart}-${w.drinkingWindowEnd}`
-          : `status: ${w.drinkingStatus || 'unknown'}`;
-        const varietalStr = (w.varietals || []).map((v) => v.varietal).join(', ');
-        const priceInfo = w.purchasePrice ? `$${w.purchasePrice}` : 'price unknown';
-        return `- ID:${w.id} | ${w.vintage || 'NV'} ${w.producer} ${w.wineName} | ${varietalStr} | ${w.region}, ${w.country} | ${priceInfo} | ${drinkingInfo} | qty: ${w.quantity || 1}`;
+          ? `drink: ${w.drinkingWindowStart}-${w.drinkingWindowEnd}`
+          : '';
+        const varietalStr = (w.varietals || []).map((v) => v.varietal).join('/');
+        const priceInfo = w.purchasePrice ? `$${w.purchasePrice}` : '';
+        // Compact format to reduce tokens
+        return `${w.id}|${w.vintage || 'NV'} ${w.producer} ${w.wineName}|${varietalStr}|${w.region}|${priceInfo}|${drinkingInfo}|qty:${w.quantity || 1}`;
       }).join('\n');
 
       systemPrompt = `You are an expert sommelier helping a wine enthusiast decide whether to bring wine from their personal collection to a restaurant (and pay corkage) or buy wine at the restaurant.

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { useAllWines } from '../hooks/useWineQueries';
-import { getCollectionStats, formatPrice } from '../utils';
+import { getCollectionStats, formatPrice, isNearEndOfDrinkingWindow, isPastPrime } from '../utils';
 import { WineCard } from '../components';
 import {
   Wine,
@@ -58,7 +58,8 @@ export function Dashboard() {
   const openedBottlesStats = useMemo(() => {
     const openBottles = wines.filter(w => w.isOpen);
     const totalOpened = openBottles.length;
-    const totalValueConsumed = openBottles.reduce((sum, w) => sum + (w.purchasePrice || 0) * w.quantity, 0);
+    // Sum purchase price per bottle (not multiplied by quantity since we're tracking opened bottles)
+    const totalValueConsumed = openBottles.reduce((sum, w) => sum + (w.purchasePrice || 0), 0);
     const recentlyOpened = openBottles
       .sort((a, b) => new Date(b.dateModified).getTime() - new Date(a.dateModified).getTime())
       .slice(0, 3);
@@ -68,6 +69,15 @@ export function Dashboard() {
       totalValueConsumed,
       recentlyOpened,
     };
+  }, [wines]);
+
+  // Calculate wines that need attention for drinking window
+  const winesDrinkSoon = useMemo(() => {
+    return wines.filter(w => isNearEndOfDrinkingWindow(w, 2) && !w.isOpen && w.quantity > 0);
+  }, [wines]);
+
+  const winesPastPrime = useMemo(() => {
+    return wines.filter(w => isPastPrime(w) && !w.isOpen && w.quantity > 0);
   }, [wines]);
 
   if (wines.length === 0) {
@@ -189,7 +199,7 @@ export function Dashboard() {
             <div className="bg-white/60 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
                 <GlassWater className="w-4 h-4 text-wine-600" />
-                <p className="text-xs text-charcoal-500">Currently Open</p>
+                <p className="text-xs text-charcoal-500">Opened Bottles</p>
               </div>
               <p className="text-xl font-bold text-charcoal-900">{openedBottlesStats.totalOpened}</p>
             </div>
@@ -329,6 +339,91 @@ export function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Drinking Window Warnings */}
+      {(winesDrinkSoon.length > 0 || winesPastPrime.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {winesDrinkSoon.length > 0 && (
+            <div className="bg-amber-50 rounded-xl border border-amber-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-amber-900 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                  Drink Within 2 Years ({winesDrinkSoon.length})
+                </h3>
+              </div>
+              <p className="text-sm text-amber-700 mb-3">
+                These wines are approaching the end of their optimal drinking window.
+              </p>
+              <div className="space-y-2">
+                {winesDrinkSoon.slice(0, 5).map(wine => (
+                  <Link
+                    key={wine.id}
+                    to={`/wine/${wine.id}`}
+                    className="block p-3 bg-white/70 rounded-lg hover:bg-white transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-charcoal-900">
+                          {wine.vintage} {wine.producer} {wine.wineName}
+                        </p>
+                        <p className="text-sm text-charcoal-500">{wine.region}</p>
+                      </div>
+                      <span className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full">
+                        Until {wine.drinkingWindowEnd}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+                {winesDrinkSoon.length > 5 && (
+                  <p className="text-sm text-amber-600 text-center pt-2">
+                    +{winesDrinkSoon.length - 5} more wines
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {winesPastPrime.length > 0 && (
+            <div className="bg-red-50 rounded-xl border border-red-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-red-900 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  Past Prime ({winesPastPrime.length})
+                </h3>
+              </div>
+              <p className="text-sm text-red-700 mb-3">
+                These wines have passed their recommended drinking window.
+              </p>
+              <div className="space-y-2">
+                {winesPastPrime.slice(0, 5).map(wine => (
+                  <Link
+                    key={wine.id}
+                    to={`/wine/${wine.id}`}
+                    className="block p-3 bg-white/70 rounded-lg hover:bg-white transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-charcoal-900">
+                          {wine.vintage} {wine.producer} {wine.wineName}
+                        </p>
+                        <p className="text-sm text-charcoal-500">{wine.region}</p>
+                      </div>
+                      <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded-full">
+                        Ended {wine.drinkingWindowEnd}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+                {winesPastPrime.length > 5 && (
+                  <p className="text-sm text-red-600 text-center pt-2">
+                    +{winesPastPrime.length - 5} more wines
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {recentlyAdded.length > 0 && (
         <div className="bg-white rounded-xl border border-charcoal-100 p-5">

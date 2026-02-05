@@ -1,5 +1,23 @@
 import { Wine, WineFormData, DrinkingStatus } from '../types';
 
+/**
+ * Check if a wine is within N years of the end of its drinking window
+ */
+export function isNearEndOfDrinkingWindow(wine: Wine, yearsThreshold = 2): boolean {
+  const currentYear = new Date().getFullYear();
+  if (!wine.drinkingWindowEnd) return false;
+  const yearsRemaining = wine.drinkingWindowEnd - currentYear;
+  return yearsRemaining > 0 && yearsRemaining <= yearsThreshold;
+}
+
+/**
+ * Check if a wine is past its drinking window
+ */
+export function isPastPrime(wine: Wine): boolean {
+  const currentYear = new Date().getFullYear();
+  return !!wine.drinkingWindowEnd && wine.drinkingWindowEnd < currentYear;
+}
+
 export function formDataToWine(formData: WineFormData): Wine {
   const now = new Date().toISOString();
   return {
