@@ -1,24 +1,45 @@
 import { Link } from 'react-router-dom';
-import { Wine } from '../types';
+import { Wine, TastingNote } from '../types';
 import { LazyImage } from './LazyImage';
 import {
   getWineDisplayName,
   getVarietalString,
   formatPrice,
-  getDrinkingStatusColor,
-  getDrinkingStatusLabel,
   getWineColorClass,
-  calculateDrinkingStatus,
+  getDrinkingWindowStoplight,
+  getStoplightColor,
+  getStoplightLabel,
+  getStoplightBorderColor,
 } from '../utils';
-import { MapPin, Calendar, DollarSign } from 'lucide-react';
+import { MapPin, Calendar, DollarSign, MessageSquare } from 'lucide-react';
 
 interface WineCardProps {
   wine: Wine;
   compact?: boolean;
 }
 
+/**
+ * Format tasting notes for display - handles both user-added notes and imported notes
+ */
+function formatTastingNotePreview(notes: TastingNote[]): string | null {
+  if (!notes || notes.length === 0) return null;
+
+  // Get the most recent note
+  const sortedNotes = [...notes].sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  const latestNote = sortedNotes[0];
+  const noteText = latestNote.notes || '';
+
+  // Truncate to ~100 chars
+  if (noteText.length <= 120) return noteText;
+  return noteText.slice(0, 117).trim() + '...';
+}
+
 export function WineCard({ wine, compact = false }: WineCardProps) {
-  const drinkingStatus = calculateDrinkingStatus(wine);
+  const stoplight = getDrinkingWindowStoplight(wine);
+  const tastingNotePreview = formatTastingNotePreview(wine.tastingNotes);
 
   if (compact) {
     return (
@@ -26,7 +47,8 @@ export function WineCard({ wine, compact = false }: WineCardProps) {
         to={`/wine/${wine.id}`}
         className="flex items-center gap-3 p-3 bg-white rounded-lg border border-charcoal-100 hover:border-wine-200 hover:shadow-sm transition-all"
       >
-        <div className={`w-3 h-12 rounded-full ${getWineColorClass(wine.wineColor)}`} />
+        {/* Stoplight indicator */}
+        <div className={`w-3 h-12 rounded-full ${getStoplightColor(stoplight)}`} title={getStoplightLabel(stoplight)} />
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-charcoal-900 truncate">
             {getWineDisplayName(wine)}
@@ -39,8 +61,8 @@ export function WineCard({ wine, compact = false }: WineCardProps) {
           <span className="text-sm font-medium text-charcoal-700">
             {formatPrice(wine.purchasePrice)}
           </span>
-          <span className={`block text-xs px-2 py-0.5 rounded-full border mt-1 ${getDrinkingStatusColor(drinkingStatus)}`}>
-            {getDrinkingStatusLabel(drinkingStatus)}
+          <span className={`block text-xs px-2 py-0.5 rounded-full border mt-1 bg-white ${getStoplightBorderColor(stoplight)}`}>
+            {getStoplightLabel(stoplight)}
           </span>
         </div>
       </Link>
@@ -50,7 +72,7 @@ export function WineCard({ wine, compact = false }: WineCardProps) {
   return (
     <Link
       to={`/wine/${wine.id}`}
-      className="group block bg-white rounded-xl border border-charcoal-100 hover:border-wine-200 hover:shadow-md transition-all overflow-hidden"
+      className={`group block bg-white rounded-xl border-2 hover:shadow-md transition-all overflow-hidden ${getStoplightBorderColor(stoplight)}`}
     >
       <div className="p-5">
         <div className="flex items-start gap-4">
@@ -69,6 +91,11 @@ export function WineCard({ wine, compact = false }: WineCardProps) {
                 {wine.quantity}
               </span>
             )}
+            {/* Stoplight dot indicator */}
+            <div
+              className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${getStoplightColor(stoplight)}`}
+              title={getStoplightLabel(stoplight)}
+            />
           </div>
 
           <div className="flex-1 min-w-0">
@@ -81,8 +108,8 @@ export function WineCard({ wine, compact = false }: WineCardProps) {
                   {getVarietalString(wine)}
                 </p>
               </div>
-              <span className={`flex-shrink-0 text-xs px-2 py-1 rounded-full border font-medium ${getDrinkingStatusColor(drinkingStatus)}`}>
-                {getDrinkingStatusLabel(drinkingStatus)}
+              <span className={`flex-shrink-0 text-xs px-2 py-1 rounded-full border font-medium bg-white ${getStoplightBorderColor(stoplight)}`}>
+                {getStoplightLabel(stoplight)}
               </span>
             </div>
 
@@ -105,7 +132,19 @@ export function WineCard({ wine, compact = false }: WineCardProps) {
               )}
             </div>
 
-            {wine.pairingSuggestions.length > 0 && (
+            {/* Tasting Notes Preview */}
+            {tastingNotePreview && (
+              <div className="mt-3 p-2 bg-charcoal-50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <MessageSquare className="w-3.5 h-3.5 text-charcoal-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-charcoal-600 line-clamp-2">
+                    {tastingNotePreview}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {wine.pairingSuggestions.length > 0 && !tastingNotePreview && (
               <div className="mt-3 flex flex-wrap gap-1">
                 {wine.pairingSuggestions.slice(0, 3).map((pairing, i) => (
                   <span

@@ -375,9 +375,12 @@ export function Dashboard() {
                   </Link>
                 ))}
                 {winesDrinkSoon.length > 5 && (
-                  <p className="text-sm text-amber-600 text-center pt-2">
-                    +{winesDrinkSoon.length - 5} more wines
-                  </p>
+                  <Link
+                    to="/collection?drinkWindow=ending-soon"
+                    className="block text-sm text-amber-600 text-center pt-2 hover:text-amber-800 hover:underline font-medium"
+                  >
+                    +{winesDrinkSoon.length - 5} more wines →
+                  </Link>
                 )}
               </div>
             </div>
@@ -415,9 +418,12 @@ export function Dashboard() {
                   </Link>
                 ))}
                 {winesPastPrime.length > 5 && (
-                  <p className="text-sm text-red-600 text-center pt-2">
-                    +{winesPastPrime.length - 5} more wines
-                  </p>
+                  <Link
+                    to="/collection?drinkWindow=past-prime"
+                    className="block text-sm text-red-600 text-center pt-2 hover:text-red-800 hover:underline font-medium"
+                  >
+                    +{winesPastPrime.length - 5} more wines →
+                  </Link>
                 )}
               </div>
             </div>

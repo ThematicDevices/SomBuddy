@@ -18,6 +18,90 @@ export function isPastPrime(wine: Wine): boolean {
   return !!wine.drinkingWindowEnd && wine.drinkingWindowEnd < currentYear;
 }
 
+/**
+ * Stoplight status for drinking window
+ * - green: Ready to Drink (within drinking window)
+ * - yellow: Drink window Ending soon (within 2 years of end)
+ * - red: Past the drink window
+ * - blue: Aging (before drinking window starts)
+ */
+export type DrinkingWindowStoplight = 'green' | 'yellow' | 'red' | 'blue' | 'unknown';
+
+export function getDrinkingWindowStoplight(wine: Wine): DrinkingWindowStoplight {
+  const currentYear = new Date().getFullYear();
+
+  // If no drinking window defined, return unknown
+  if (!wine.drinkingWindowStart && !wine.drinkingWindowEnd) {
+    return 'unknown';
+  }
+
+  // Past prime - red
+  if (wine.drinkingWindowEnd && currentYear > wine.drinkingWindowEnd) {
+    return 'red';
+  }
+
+  // Still aging - blue
+  if (wine.drinkingWindowStart && currentYear < wine.drinkingWindowStart) {
+    return 'blue';
+  }
+
+  // Within 2 years of end - yellow
+  if (wine.drinkingWindowEnd) {
+    const yearsRemaining = wine.drinkingWindowEnd - currentYear;
+    if (yearsRemaining > 0 && yearsRemaining <= 2) {
+      return 'yellow';
+    }
+  }
+
+  // Ready to drink - green
+  return 'green';
+}
+
+export function getStoplightColor(stoplight: DrinkingWindowStoplight): string {
+  switch (stoplight) {
+    case 'green':
+      return 'bg-green-500';
+    case 'yellow':
+      return 'bg-amber-400';
+    case 'red':
+      return 'bg-red-500';
+    case 'blue':
+      return 'bg-blue-500';
+    default:
+      return 'bg-charcoal-300';
+  }
+}
+
+export function getStoplightLabel(stoplight: DrinkingWindowStoplight): string {
+  switch (stoplight) {
+    case 'green':
+      return 'Ready to Drink';
+    case 'yellow':
+      return 'Drink Soon';
+    case 'red':
+      return 'Past Prime';
+    case 'blue':
+      return 'Aging';
+    default:
+      return 'Unknown';
+  }
+}
+
+export function getStoplightBorderColor(stoplight: DrinkingWindowStoplight): string {
+  switch (stoplight) {
+    case 'green':
+      return 'border-green-500';
+    case 'yellow':
+      return 'border-amber-400';
+    case 'red':
+      return 'border-red-500';
+    case 'blue':
+      return 'border-blue-500';
+    default:
+      return 'border-charcoal-300';
+  }
+}
+
 export function formDataToWine(formData: WineFormData): Wine {
   const now = new Date().toISOString();
   return {

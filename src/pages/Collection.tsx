@@ -3,9 +3,71 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAllWines } from '../hooks/useWineQueries';
 import { WineCard, WineCardSkeletonList } from '../components';
-import { searchWines, filterWines } from '../utils';
-import { DrinkingStatus, WineColor, wineColorOptions } from '../types';
-import { Search, SlidersHorizontal, X, Wine, PlusCircle, Loader2, ChevronDown } from 'lucide-react';
+import { searchWines, filterWines, isNearEndOfDrinkingWindow, isPastPrime, getDrinkingWindowStoplight } from '../utils';
+import { DrinkingStatus, WineColor, wineColorOptions, Wine } from '../types';
+import { Search, SlidersHorizontal, X, Wine as WineIcon, PlusCircle, Loader2, ChevronDown, ArrowUpDown } from 'lucide-react';
+
+type SortOption = 'newest' | 'oldest' | 'price-high' | 'price-low' | 'drink-window' | 'vintage-new' | 'vintage-old' | 'name';
+type DrinkWindowFilter = 'any' | 'ready' | 'aging' | 'ending-soon' | 'past-prime';
+
+const sortOptions: { value: SortOption; label: string }[] = [
+  { value: 'newest', label: 'Recently Added' },
+  { value: 'oldest', label: 'Oldest Added' },
+  { value: 'price-high', label: 'Price: High to Low' },
+  { value: 'price-low', label: 'Price: Low to High' },
+  { value: 'drink-window', label: 'Drink Soonest First' },
+  { value: 'vintage-new', label: 'Vintage: Newest' },
+  { value: 'vintage-old', label: 'Vintage: Oldest' },
+  { value: 'name', label: 'Name A-Z' },
+];
+
+function sortWines(wines: Wine[], sortBy: SortOption): Wine[] {
+  const sorted = [...wines];
+  switch (sortBy) {
+    case 'newest':
+      return sorted.sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
+    case 'oldest':
+      return sorted.sort((a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime());
+    case 'price-high':
+      return sorted.sort((a, b) => (b.purchasePrice || 0) - (a.purchasePrice || 0));
+    case 'price-low':
+      return sorted.sort((a, b) => (a.purchasePrice || 0) - (b.purchasePrice || 0));
+    case 'drink-window':
+      return sorted.sort((a, b) => {
+        const aEnd = a.drinkingWindowEnd || 9999;
+        const bEnd = b.drinkingWindowEnd || 9999;
+        return aEnd - bEnd;
+      });
+    case 'vintage-new':
+      return sorted.sort((a, b) => (b.vintage || 0) - (a.vintage || 0));
+    case 'vintage-old':
+      return sorted.sort((a, b) => (a.vintage || 9999) - (b.vintage || 9999));
+    case 'name':
+      return sorted.sort((a, b) => a.producer.localeCompare(b.producer));
+    default:
+      return sorted;
+  }
+}
+
+function filterByDrinkWindow(wines: Wine[], filter: DrinkWindowFilter): Wine[] {
+  if (filter === 'any') return wines;
+
+  return wines.filter(wine => {
+    const stoplight = getDrinkingWindowStoplight(wine);
+    switch (filter) {
+      case 'ready':
+        return stoplight === 'green';
+      case 'aging':
+        return stoplight === 'blue';
+      case 'ending-soon':
+        return stoplight === 'yellow' || isNearEndOfDrinkingWindow(wine, 2);
+      case 'past-prime':
+        return stoplight === 'red' || isPastPrime(wine);
+      default:
+        return true;
+    }
+  });
+}
 
 export function Collection() {
   const { wines, isLoading, isFetching, hasNextPage, fetchNextPage, totalCount } = useAllWines();
@@ -13,6 +75,10 @@ export function Collection() {
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>((searchParams.get('sort') as SortOption) || 'newest');
+  const [drinkWindowFilter, setDrinkWindowFilter] = useState<DrinkWindowFilter>(
+    (searchParams.get('drinkWindow') as DrinkWindowFilter) || 'any'
+  );
   const [filters, setFilters] = useState({
     wineColor: searchParams.get('color') as WineColor | undefined,
     drinkingStatus: searchParams.get('status') as DrinkingStatus | undefined,
@@ -21,6 +87,13 @@ export function Collection() {
     region: searchParams.get('region') || undefined,
     varietal: searchParams.get('varietal') || undefined,
   });
+
+  // Open filters if there's a drink window filter from URL
+  useEffect(() => {
+    if (searchParams.get('drinkWindow')) {
+      setShowFilters(true);
+    }
+  }, [searchParams]);
 
   // Virtual scrolling container ref
   const parentRef = useRef<HTMLDivElement>(null);
@@ -36,10 +109,14 @@ export function Collection() {
       result = filterWines(result, filters);
     }
 
-    return result.sort((a, b) =>
-      new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
-    );
-  }, [wines, searchQuery, filters]);
+    // Apply drink window filter (from Dashboard links)
+    result = filterByDrinkWindow(result, drinkWindowFilter);
+
+    // Apply sorting
+    result = sortWines(result, sortBy);
+
+    return result;
+  }, [wines, searchQuery, filters, drinkWindowFilter, sortBy]);
 
   const uniqueRegions = useMemo(() =>
     [...new Set(wines.map(w => w.region))].sort(),
@@ -109,7 +186,7 @@ export function Collection() {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
         <div className="w-24 h-24 bg-wine-50 rounded-full flex items-center justify-center mb-6">
-          <Wine className="w-12 h-12 text-wine-400" />
+          <WineIcon className="w-12 h-12 text-wine-400" />
         </div>
         <h2 className="text-2xl font-display font-bold text-charcoal-900 mb-2">
           Your Collection is Empty
@@ -159,6 +236,22 @@ export function Collection() {
               className="w-full pl-10 pr-4 py-2.5 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
             />
           </div>
+
+          {/* Sort dropdown */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as SortOption)}
+              className="appearance-none pl-9 pr-8 py-2.5 border border-charcoal-200 rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors bg-white cursor-pointer"
+            >
+              {sortOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-400 pointer-events-none" />
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-400 pointer-events-none" />
+          </div>
+
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg font-medium transition-colors ${
@@ -179,7 +272,7 @@ export function Collection() {
 
         {showFilters && (
           <div className="mt-4 pt-4 border-t border-charcoal-100">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
               <div>
                 <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Wine Type</label>
                 <select
@@ -191,6 +284,25 @@ export function Collection() {
                   {wineColorOptions.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Drink Window</label>
+                <select
+                  value={drinkWindowFilter}
+                  onChange={e => setDrinkWindowFilter(e.target.value as DrinkWindowFilter)}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none ${
+                    drinkWindowFilter !== 'any'
+                      ? 'border-wine-300 bg-wine-50'
+                      : 'border-charcoal-200'
+                  }`}
+                >
+                  <option value="any">Any</option>
+                  <option value="ready">🟢 Ready to Drink</option>
+                  <option value="aging">🔵 Aging</option>
+                  <option value="ending-soon">🟡 Ending Soon</option>
+                  <option value="past-prime">🔴 Past Prime</option>
                 </select>
               </div>
 
@@ -259,9 +371,12 @@ export function Collection() {
               </div>
             </div>
 
-            {hasActiveFilters && (
+            {(hasActiveFilters || drinkWindowFilter !== 'any') && (
               <button
-                onClick={clearFilters}
+                onClick={() => {
+                  clearFilters();
+                  setDrinkWindowFilter('any');
+                }}
                 className="mt-4 flex items-center gap-1 text-sm text-wine-700 hover:text-wine-900 font-medium"
               >
                 <X className="w-4 h-4" />
@@ -274,7 +389,7 @@ export function Collection() {
 
       {filteredWines.length === 0 ? (
         <div className="text-center py-12">
-          <Wine className="w-12 h-12 text-charcoal-300 mx-auto mb-4" />
+          <WineIcon className="w-12 h-12 text-charcoal-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-charcoal-700 mb-2">No wines found</h3>
           <p className="text-charcoal-500">
             Try adjusting your search or filters
