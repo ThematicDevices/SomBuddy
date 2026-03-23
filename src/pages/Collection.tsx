@@ -194,8 +194,8 @@ export function Collection() {
   const rowVirtualizer = useVirtualizer({
     count: Math.ceil(filteredWines.length / 2),
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 140, // Estimated row height
-    overscan: 3,
+    estimateSize: () => 240, // Estimated row height
+    overscan: 5,
   });
 
   // Load more when scrolled near bottom
