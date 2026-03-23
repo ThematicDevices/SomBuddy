@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-primary: #0f0d0b;
+  --bg-surface: #1a1612;
+  --bg-card: #201c18;
+  --bg-card-hover: #262119;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-medium: rgba(255,255,255,0.1);
+  --text-primary: #f5f0eb;
+  --text-secondary: #9c9189;
+  --text-muted: #5c5248;
+  --accent-wine: #c4505a;
+  --accent-gold: #d4af37;
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
@@ -10,7 +24,7 @@
 
   body {
     @apply text-charcoal-900;
-    background-color: #faf9f7;
+    background-color: #0f0d0b;
   }
 }
 
@@ -74,31 +88,55 @@
 
 @layer components {
   .input-base {
-    @apply w-full px-3 py-2 border border-charcoal-200 rounded-lg
-           focus:ring-2 focus:ring-wine-500 focus:border-wine-500
-           outline-none transition-colors;
+    @apply w-full px-3 py-2 rounded-lg outline-none transition-colors;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-medium);
+    color: var(--text-primary);
+  }
+
+  .input-base:focus {
+    border-color: var(--accent-wine);
+    box-shadow: 0 0 0 2px rgba(196, 80, 90, 0.2);
   }
 
   .btn-primary {
-    @apply px-4 py-2 bg-wine-900 text-white rounded-lg
-           hover:bg-wine-800 disabled:opacity-50 disabled:cursor-not-allowed
+    @apply px-4 py-2 text-white rounded-lg
+           disabled:opacity-50 disabled:cursor-not-allowed
            font-medium transition-colors;
+    background: var(--accent-wine);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #b34450;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 border border-charcoal-200 text-charcoal-700
-           rounded-lg hover:bg-charcoal-50 transition-colors font-medium;
+    @apply px-4 py-2 rounded-lg transition-colors font-medium;
+    border: 1px solid var(--border-medium);
+    color: var(--text-secondary);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-primary);
   }
 
   .card {
-    @apply bg-white rounded-xl border border-charcoal-100;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    @apply rounded-xl;
+  }
+
+  .card-dark {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    @apply rounded-2xl;
   }
 
   .glass-card {
-    background: rgba(255,255,255,0.85);
+    background: rgba(26, 22, 18, 0.85);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.6);
+    border: 1px solid var(--border-subtle);
   }
 }
 
@@ -108,16 +146,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #2a2520;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c9a3ab;
+  background: #3d3630;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a87880;
+  background: #4a4038;
 }
 
 input[type="number"]::-webkit-inner-spin-button,

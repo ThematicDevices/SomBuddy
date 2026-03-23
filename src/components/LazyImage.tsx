@@ -9,7 +9,7 @@ interface LazyImageProps {
   fallbackIcon?: React.ReactNode;
   thumbnailSize?: { width: number; height: number };
   storagePath?: string | null;
-  scrollContainer?: React.RefObject<Element>;
+  eager?: boolean;
 }
 
 // Simple in-memory cache for loaded images
@@ -23,11 +23,11 @@ export function LazyImage({
   fallbackIcon,
   thumbnailSize,
   storagePath,
-  scrollContainer,
+  eager = false,
 }: LazyImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const [isInView, setIsInView] = useState(false);
+  const [isInView, setIsInView] = useState(eager);
   const imgRef = useRef<HTMLDivElement>(null);
 
   // Use storage path if available (for migrated images), otherwise fall back to base64
@@ -41,8 +41,10 @@ export function LazyImage({
     }
   }, [imageUrl]);
 
-  // Intersection Observer for lazy loading
+  // Intersection Observer for lazy loading (skipped when eager)
   useEffect(() => {
+    if (eager) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -53,7 +55,6 @@ export function LazyImage({
         });
       },
       {
-        root: scrollContainer?.current ?? null,
         rootMargin: '100px', // Start loading 100px before entering viewport
         threshold: 0.01,
       }
@@ -64,7 +65,7 @@ export function LazyImage({
     }
 
     return () => observer.disconnect();
-  }, [scrollContainer]);
+  }, [eager]);
 
   const handleLoad = () => {
     setLoaded(true);
@@ -119,10 +120,3 @@ export function LazyImage({
     </div>
   );
 }
-
-// Add shimmer animation to tailwind (add this to your global CSS or tailwind config)
-// @keyframes shimmer {
-//   0% { transform: translateX(-100%); }
-//   100% { transform: translateX(100%); }
-// }
-// .animate-shimmer { animation: shimmer 1.5s infinite; }

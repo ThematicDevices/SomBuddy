@@ -219,8 +219,8 @@ export function Collection() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold text-charcoal-900">🍷 Wine Collection</h1>
-            <p className="text-charcoal-500">Loading your wines...</p>
+            <h1 className="text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>Wine Collection</h1>
+            <p style={{ color: 'var(--text-secondary)' }}>Loading your wines...</p>
           </div>
         </div>
         <WineCardSkeletonList count={6} />
@@ -256,10 +256,10 @@ export function Collection() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-charcoal-900">🍷 Wine Collection</h1>
-          <p className="text-charcoal-500">
+          <h1 className="text-2xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>Wine Collection</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>
             {filteredWines.length} of {totalCount} wines
-            {isFetching && <span className="ml-2 text-wine-600">• Syncing...</span>}
+            {isFetching && <span className="ml-2" style={{ color: 'var(--accent-wine)' }}>• Syncing...</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -267,7 +267,8 @@ export function Collection() {
             <button
               onClick={handleRefreshPrices}
               disabled={isUpdatingPrices || isPriceUpdateOnCooldown}
-              className="flex items-center gap-2 px-4 py-2 bg-wine-900 text-white rounded-lg hover:bg-wine-800 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'var(--accent-wine)' }}
             >
               {isUpdatingPrices ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -277,14 +278,15 @@ export function Collection() {
               {isUpdatingPrices ? 'Updating...' : 'Refresh Prices'}
             </button>
             {lastPricesUpdated !== null && (
-              <span className="text-xs text-charcoal-400 mt-0.5">
+              <span className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 Last updated: {formatLastUpdated(lastPricesUpdated)}
               </span>
             )}
           </div>
           <Link
             to="/add"
-            className="flex items-center gap-2 px-4 py-2 bg-wine-900 text-white rounded-lg hover:bg-wine-800 transition-colors font-medium text-sm"
+            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors font-medium text-sm"
+            style={{ background: 'var(--accent-wine)' }}
           >
             <PlusCircle className="w-4 h-4" />
             Add Wine
@@ -292,16 +294,20 @@ export function Collection() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-charcoal-100 p-4">
+      <div
+        className="rounded-xl p-4"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}
+      >
         <div className="flex gap-3">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-charcoal-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search by producer, varietal, region..."
-              className="w-full pl-10 pr-4 py-2.5 border border-charcoal-200 rounded-lg focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg outline-none transition-colors"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
             />
           </div>
 
@@ -310,28 +316,33 @@ export function Collection() {
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as SortOption)}
-              className="appearance-none pl-9 pr-8 py-2.5 border border-charcoal-200 rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none transition-colors bg-white cursor-pointer"
+              className="appearance-none pl-9 pr-8 py-2.5 rounded-lg text-sm outline-none transition-colors cursor-pointer"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
             >
               {sortOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-400 pointer-events-none" />
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-400 pointer-events-none" />
+            <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
           </div>
 
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg font-medium transition-colors ${
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors"
+            style={
               showFilters || hasActiveFilters
-                ? 'border-wine-300 bg-wine-50 text-wine-800'
-                : 'border-charcoal-200 text-charcoal-600 hover:bg-charcoal-50'
-            }`}
+                ? { border: '1px solid rgba(196,80,90,0.4)', background: 'rgba(196,80,90,0.1)', color: 'var(--accent-wine)' }
+                : { border: '1px solid var(--border-medium)', color: 'var(--text-secondary)' }
+            }
           >
             <SlidersHorizontal className="w-4 h-4" />
             Filters
             {hasActiveFilters && (
-              <span className="w-5 h-5 bg-wine-700 text-white text-xs rounded-full flex items-center justify-center">
+              <span
+                className="w-5 h-5 text-white text-xs rounded-full flex items-center justify-center"
+                style={{ background: 'var(--accent-wine)' }}
+              >
                 {Object.values(filters).filter(v => v !== undefined).length + (searchQuery ? 1 : 0)}
               </span>
             )}
@@ -339,14 +350,15 @@ export function Collection() {
         </div>
 
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-charcoal-100">
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
               <div>
-                <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Wine Type</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Wine Type</label>
                 <select
                   value={filters.wineColor || ''}
                   onChange={e => setFilters(f => ({ ...f, wineColor: e.target.value as WineColor || undefined }))}
-                  className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
                 >
                   <option value="">All Types</option>
                   {wineColorOptions.map(opt => (
@@ -356,15 +368,12 @@ export function Collection() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Drink Window</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Drink Window</label>
                 <select
                   value={drinkWindowFilter}
                   onChange={e => setDrinkWindowFilter(e.target.value as DrinkWindowFilter)}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none ${
-                    drinkWindowFilter !== 'any'
-                      ? 'border-wine-300 bg-wine-50'
-                      : 'border-charcoal-200'
-                  }`}
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--bg-surface)', border: `1px solid ${drinkWindowFilter !== 'any' ? 'rgba(196,80,90,0.4)' : 'var(--border-medium)'}`, color: 'var(--text-primary)' }}
                 >
                   <option value="any">Any</option>
                   <option value="ready">🟢 Ready to Drink</option>
@@ -375,11 +384,12 @@ export function Collection() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Status</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Status</label>
                 <select
                   value={filters.drinkingStatus || ''}
                   onChange={e => setFilters(f => ({ ...f, drinkingStatus: e.target.value as DrinkingStatus || undefined }))}
-                  className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
                 >
                   <option value="">Any Status</option>
                   <option value="ready">Ready to Drink</option>
@@ -389,11 +399,12 @@ export function Collection() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Region</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Region</label>
                 <select
                   value={filters.region || ''}
                   onChange={e => setFilters(f => ({ ...f, region: e.target.value || undefined }))}
-                  className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
                 >
                   <option value="">All Regions</option>
                   {uniqueRegions.map(region => (
@@ -403,11 +414,12 @@ export function Collection() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Varietal</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Varietal</label>
                 <select
                   value={filters.varietal || ''}
                   onChange={e => setFilters(f => ({ ...f, varietal: e.target.value || undefined }))}
-                  className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
                 >
                   <option value="">All Varietals</option>
                   {uniqueVarietals.map(varietal => (
@@ -417,24 +429,26 @@ export function Collection() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Min Price</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Min Price</label>
                 <input
                   type="number"
                   value={filters.minPrice || ''}
                   onChange={e => setFilters(f => ({ ...f, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
                   placeholder="$0"
-                  className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-charcoal-500 mb-1.5">Max Price</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Max Price</label>
                 <input
                   type="number"
                   value={filters.maxPrice || ''}
                   onChange={e => setFilters(f => ({ ...f, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
                   placeholder="No limit"
-                  className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
                 />
               </div>
             </div>
@@ -445,7 +459,8 @@ export function Collection() {
                   clearFilters();
                   setDrinkWindowFilter('any');
                 }}
-                className="mt-4 flex items-center gap-1 text-sm text-wine-700 hover:text-wine-900 font-medium"
+                className="mt-4 flex items-center gap-1 text-sm font-medium"
+                style={{ color: 'var(--accent-wine)' }}
               >
                 <X className="w-4 h-4" />
                 Clear all filters
@@ -496,8 +511,8 @@ export function Collection() {
                     }}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
-                      {wine1 && <WineCard key={wine1.id} wine={wine1} scrollContainer={parentRef} />}
-                      {wine2 && <WineCard key={wine2.id} wine={wine2} scrollContainer={parentRef} />}
+                      {wine1 && <WineCard key={wine1.id} wine={wine1} />}
+                      {wine2 && <WineCard key={wine2.id} wine={wine2} />}
                     </div>
                   </div>
                 );
