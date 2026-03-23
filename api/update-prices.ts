@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
-const CLAUDE_MODEL = 'claude-haiku-4-20251001';
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 
 interface Wine {
   id: string;
@@ -34,7 +34,11 @@ async function getWinePriceEstimate(
     wine.country ? `(${wine.country})` : ''
   ].filter(Boolean).join(' ');
 
-  const systemPrompt = `You are a wine pricing expert. Estimate the current market price (in USD) for the following wine based on recent market data, auction results, and retailer prices. Return ONLY a JSON object with the format: {"estimatedPrice": 45.00}. Be realistic and accurate.`;
+  const systemPrompt = `You are a wine pricing expert. Estimate the current retail market price (in USD) for the following wine. Consider Wine-Searcher typical retail prices, recent auction records, and the producer's market tier. If this is a well-known producer or label, lean on its known market positioning rather than estimating purely from region/varietal.
+
+Estimate a LOW retail price and a HIGH retail price that reflects the realistic market range, then set estimatedPrice to the midpoint. Note that your training data may be 1-2 years old — factor in typical annual price appreciation of 5-10% for premium wines.
+
+Return ONLY a JSON object with the format: {"estimatedPrice": 45.00, "priceRangeLow": 40, "priceRangeHigh": 60}. Be realistic and accurate.`;
 
   try {
     const response = await fetch(CLAUDE_API_URL, {
@@ -70,6 +74,9 @@ async function getWinePriceEstimate(
     const jsonMatch = result.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
+      if (typeof parsed.priceRangeLow === 'number' && typeof parsed.priceRangeHigh === 'number') {
+        return (parsed.priceRangeLow + parsed.priceRangeHigh) / 2;
+      }
       if (typeof parsed.estimatedPrice === 'number') {
         return parsed.estimatedPrice;
       }

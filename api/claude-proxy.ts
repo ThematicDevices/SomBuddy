@@ -85,6 +85,7 @@ const WINE_EXTRACTION_SCHEMA = `{
   "wineColor": "red|white|rosé|sparkling|dessert|fortified|orange",
   "alcoholContent": 14.5,
   "estimatedPrice": 45.00,
+  "priceRange": {"low": 40, "high": 60},
   "tastingNotes": [
     {"category": "Aroma", "notes": "blackberry, cedar, vanilla"},
     {"category": "Palate", "notes": "full-bodied, velvety tannins, long finish"},
@@ -114,7 +115,8 @@ Output: {
   "varietals": [{"varietal": "Cabernet Sauvignon", "percentage": 100}],
   "wineColor": "red",
   "alcoholContent": 14.6,
-  "estimatedPrice": 85.00,
+  "estimatedPrice": 82.50,
+  "priceRange": {"low": 75, "high": 90},
   "tastingNotes": [
     {"category": "Aroma", "notes": "ripe dark cherry, cassis, cocoa, vanilla"},
     {"category": "Palate", "notes": "rich and velvety, dark fruit, soft tannins, long finish"},
@@ -142,7 +144,8 @@ Output: {
   "varietals": [{"varietal": "Pinot Noir", "percentage": 50}, {"varietal": "Chardonnay", "percentage": 28}, {"varietal": "Pinot Meunier", "percentage": 22}],
   "wineColor": "sparkling",
   "alcoholContent": 12.0,
-  "estimatedPrice": 55.00,
+  "estimatedPrice": 60.00,
+  "priceRange": {"low": 55, "high": 65},
   "tastingNotes": [
     {"category": "Aroma", "notes": "apple, pear, brioche, light citrus"},
     {"category": "Palate", "notes": "balanced acidity, fine bubbles, toasty notes"},
@@ -170,7 +173,8 @@ Output: {
   "varietals": [{"varietal": "Grenache", "percentage": 45}, {"varietal": "Cinsault", "percentage": 30}, {"varietal": "Syrah", "percentage": 25}],
   "wineColor": "rosé",
   "alcoholContent": 13.0,
-  "estimatedPrice": 18.00,
+  "estimatedPrice": 20.00,
+  "priceRange": {"low": 15, "high": 25},
   "tastingNotes": [
     {"category": "Aroma", "notes": "strawberry, peach, citrus"},
     {"category": "Palate", "notes": "dry, refreshing, mineral finish"},
@@ -249,11 +253,25 @@ DRINKING WINDOW:
 - Start year = when wine becomes enjoyable, End year = when it will likely decline
 
 PRICE ESTIMATION:
-- Entry-level: $8-20
-- Mid-range: $20-50
-- Premium: $50-100
-- Luxury: $100-250
-- Icon/Collector: $250+
+First, determine if the wine is from a well-known producer or label. If so, lean on its known market positioning rather than estimating purely from region/varietal. Use these real-world benchmarks to anchor your estimates:
+- Veuve Clicquot Brut NV ~$55-65
+- Caymus Napa Cabernet Sauvignon ~$75-90
+- Caymus Special Selection Napa Cabernet ~$85-105
+- Jordan Cabernet Sauvignon ~$55-70
+- Silver Oak Napa Cabernet ~$90-110
+- Opus One ~$375-425
+- Screaming Eagle ~$3,000+
+- Harlan Estate ~$900+
+- Penfolds Grange ~$750+
+- Château Margaux (standard vintage) ~$600+
+- Château Pétrus ~$3,000+
+- Domaine de la Romanée-Conti ~$5,000+
+- Kistler Chardonnay ~$60-80
+- Stag's Leap Wine Cellars Cask 23 ~$200+
+
+For all wines, estimate a LOW retail price and a HIGH retail price that reflects the realistic market range. Set estimatedPrice to the midpoint of that range. Set priceRange to {"low": <low>, "high": <high>}.
+
+Consider that your training data may be 1-2 years old — factor in typical annual price appreciation of 5-10% for premium wines when estimating current prices.
 
 CONFIDENCE SCORE:
 - 0.9-1.0: Label is clear, well-known wine, high certainty
@@ -317,7 +335,7 @@ ${WINE_EXTRACTION_SCHEMA}
 
 IMPORTANT GUIDELINES:
 - Fill in any missing basic information you know about this wine
-- Estimate current market price (USD) based on producer reputation and quality tier
+- For price: first check if this is a well-known producer or label — if so, lean on its known market positioning. Estimate a LOW retail price and a HIGH retail price, set estimatedPrice to the midpoint, and set priceRange to {"low": <low>, "high": <high>}. Consider that your training data may be 1-2 years old — factor in typical annual price appreciation of 5-10% for premium wines.
 - Provide professional tasting notes typical for this wine style
 - Calculate drinking window: start year should be when it begins drinking well, end year when it will likely decline
 - Suggest food pairings that complement the wine style
