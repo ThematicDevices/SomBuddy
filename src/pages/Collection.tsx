@@ -194,7 +194,7 @@ export function Collection() {
   const rowVirtualizer = useVirtualizer({
     count: Math.ceil(filteredWines.length / 2),
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 240, // Estimated row height
+    estimateSize: () => 260, // Estimated row height
     overscan: 5,
   });
 
@@ -219,7 +219,7 @@ export function Collection() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold text-charcoal-900">Wine Collection</h1>
+            <h1 className="text-2xl font-display font-bold text-charcoal-900">🍷 Wine Collection</h1>
             <p className="text-charcoal-500">Loading your wines...</p>
           </div>
         </div>
@@ -256,7 +256,7 @@ export function Collection() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-charcoal-900">Wine Collection</h1>
+          <h1 className="text-2xl font-display font-bold text-charcoal-900">🍷 Wine Collection</h1>
           <p className="text-charcoal-500">
             {filteredWines.length} of {totalCount} wines
             {isFetching && <span className="ml-2 text-wine-600">• Syncing...</span>}
@@ -496,8 +496,8 @@ export function Collection() {
                     }}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
-                      {wine1 && <WineCard key={wine1.id} wine={wine1} />}
-                      {wine2 && <WineCard key={wine2.id} wine={wine2} />}
+                      {wine1 && <WineCard key={wine1.id} wine={wine1} scrollContainer={parentRef} />}
+                      {wine2 && <WineCard key={wine2.id} wine={wine2} scrollContainer={parentRef} />}
                     </div>
                   </div>
                 );

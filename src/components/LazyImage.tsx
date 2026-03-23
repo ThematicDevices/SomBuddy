@@ -53,6 +53,7 @@ export function LazyImage({
         });
       },
       {
+        root: scrollContainer?.current ?? null,
         rootMargin: '100px', // Start loading 100px before entering viewport
         threshold: 0.01,
       }
@@ -63,7 +64,7 @@ export function LazyImage({
     }
 
     return () => observer.disconnect();
-  }, []);
+  }, [scrollContainer]);
 
   const handleLoad = () => {
     setLoaded(true);

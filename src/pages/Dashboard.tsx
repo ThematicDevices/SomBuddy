@@ -138,7 +138,7 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-charcoal-100 p-4">
+        <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-wine-50 rounded-lg flex items-center justify-center">
               <Wine className="w-5 h-5 text-wine-700" />
@@ -150,7 +150,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-charcoal-100 p-4">
+        <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gold-50 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-gold-700" />
@@ -162,7 +162,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-charcoal-100 p-4">
+        <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-green-600" />
@@ -174,7 +174,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-charcoal-100 p-4">
+        <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
               <Clock className="w-5 h-5 text-amber-600" />
@@ -234,8 +234,8 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {colorData.length > 0 && (
-          <div className="bg-white rounded-xl border border-charcoal-100 p-5">
-            <h3 className="font-semibold text-charcoal-900 mb-4">By Wine Type</h3>
+          <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5">
+            <h3 className="font-display font-semibold text-lg text-charcoal-900 mb-4">By Wine Type</h3>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -274,8 +274,8 @@ export function Dashboard() {
         )}
 
         {regionData.length > 0 && (
-          <div className="bg-white rounded-xl border border-charcoal-100 p-5">
-            <h3 className="font-semibold text-charcoal-900 mb-4">Top Regions</h3>
+          <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5">
+            <h3 className="font-display font-semibold text-lg text-charcoal-900 mb-4">Top Regions</h3>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={regionData} layout="vertical">
@@ -302,9 +302,9 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {readyToDrink.length > 0 && (
-          <div className="bg-white rounded-xl border border-charcoal-100 p-5">
+          <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-charcoal-900 flex items-center gap-2">
+              <h3 className="font-display font-semibold text-lg text-charcoal-900 flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-600" />
                 Ready to Drink
               </h3>
@@ -321,9 +321,9 @@ export function Dashboard() {
         )}
 
         {needsAttention.length > 0 && (
-          <div className="bg-white rounded-xl border border-charcoal-100 p-5">
+          <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-charcoal-900 flex items-center gap-2">
+              <h3 className="font-display font-semibold text-lg text-charcoal-900 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
                 Past Peak - Drink Soon
               </h3>
@@ -432,9 +432,9 @@ export function Dashboard() {
       )}
 
       {recentlyAdded.length > 0 && (
-        <div className="bg-white rounded-xl border border-charcoal-100 p-5">
+        <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-charcoal-900">Recently Added</h3>
+            <h3 className="font-display font-semibold text-lg text-charcoal-900">Recently Added</h3>
             <Link to="/collection" className="text-sm text-wine-700 hover:text-wine-900 font-medium">
               View All →
             </Link>
