@@ -90,32 +90,42 @@ Return ONLY a JSON object with the format: {"estimatedPrice": 45.00, "priceRange
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // This endpoint can be called by Vercel Cron or manually with a secret
+  // This endpoint can be called by Vercel Cron, with a CRON_SECRET, or by an authenticated user JWT
   const authHeader = req.headers.authorization;
   const cronSecret = process.env.CRON_SECRET;
 
-  // Vercel Cron jobs include this header
-  const isVercelCron = authHeader === `Bearer ${cronSecret}`;
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!isVercelCron && cronSecret) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    return res.status(500).json({ error: 'Supabase credentials not configured' });
+  }
+
+  // Initialize Supabase with service role key for admin access
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+  const isVercelCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
+  let isAuthorized = isVercelCron;
+
+  if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (user) {
+      isAuthorized = true;
+    }
+  }
+
+  // If no cronSecret is configured (dev mode), allow through
+  if (!isAuthorized && cronSecret) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
     const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
-    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!CLAUDE_API_KEY) {
       throw new Error('Claude API key not configured');
     }
-
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-      throw new Error('Supabase credentials not configured');
-    }
-
-    // Initialize Supabase with service role key for admin access
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     // Fetch all wines that need price updates
     const { data: wines, error: fetchError } = await supabase

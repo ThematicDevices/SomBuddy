@@ -9,6 +9,7 @@ interface LazyImageProps {
   fallbackIcon?: React.ReactNode;
   thumbnailSize?: { width: number; height: number };
   storagePath?: string | null;
+  scrollContainer?: React.RefObject<Element>;
 }
 
 // Simple in-memory cache for loaded images
@@ -22,6 +23,7 @@ export function LazyImage({
   fallbackIcon,
   thumbnailSize,
   storagePath,
+  scrollContainer,
 }: LazyImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
@@ -51,6 +53,7 @@ export function LazyImage({
         });
       },
       {
+        root: scrollContainer?.current ?? null,
         rootMargin: '100px', // Start loading 100px before entering viewport
         threshold: 0.01,
       }
@@ -61,7 +64,7 @@ export function LazyImage({
     }
 
     return () => observer.disconnect();
-  }, []);
+  }, [scrollContainer]);
 
   const handleLoad = () => {
     setLoaded(true);

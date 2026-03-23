@@ -5,7 +5,23 @@ import { useAllWines } from '../hooks/useWineQueries';
 import { WineCard, WineCardSkeletonList } from '../components';
 import { searchWines, filterWines, isNearEndOfDrinkingWindow, isPastPrime, getDrinkingWindowStoplight } from '../utils';
 import { DrinkingStatus, WineColor, wineColorOptions, Wine } from '../types';
-import { Search, SlidersHorizontal, X, Wine as WineIcon, PlusCircle, Loader2, ChevronDown, ArrowUpDown } from 'lucide-react';
+import { Search, SlidersHorizontal, X, Wine as WineIcon, PlusCircle, Loader2, ChevronDown, ArrowUpDown, RefreshCw } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+
+const PRICES_LAST_UPDATED_KEY = 'sombuddy_prices_last_updated';
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+function formatLastUpdated(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return 'just now';
+  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+}
 
 type SortOption = 'newest' | 'oldest' | 'price-high' | 'price-low' | 'drink-window' | 'vintage-new' | 'vintage-old' | 'name';
 type DrinkWindowFilter = 'any' | 'ready' | 'aging' | 'ending-soon' | 'past-prime';
@@ -72,6 +88,37 @@ function filterByDrinkWindow(wines: Wine[], filter: DrinkWindowFilter): Wine[] {
 export function Collection() {
   const { wines, isLoading, isFetching, hasNextPage, fetchNextPage, totalCount } = useAllWines();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { session } = useAuth();
+  const { showToast } = useToast();
+  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
+  const [lastPricesUpdated, setLastPricesUpdated] = useState<number | null>(() => {
+    const stored = localStorage.getItem(PRICES_LAST_UPDATED_KEY);
+    return stored ? Number(stored) : null;
+  });
+
+  const isPriceUpdateOnCooldown = lastPricesUpdated !== null && Date.now() - lastPricesUpdated < COOLDOWN_MS;
+
+  const handleRefreshPrices = async () => {
+    if (!session?.access_token || isUpdatingPrices || isPriceUpdateOnCooldown) return;
+    setIsUpdatingPrices(true);
+    try {
+      const response = await fetch('/api/update-prices', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      if (!response.ok) throw new Error('Request failed');
+      const now = Date.now();
+      localStorage.setItem(PRICES_LAST_UPDATED_KEY, String(now));
+      setLastPricesUpdated(now);
+      showToast('Prices updated successfully', 'success');
+    } catch {
+      showToast('Failed to update prices', 'error');
+    } finally {
+      setIsUpdatingPrices(false);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [showFilters, setShowFilters] = useState(false);
@@ -147,8 +194,8 @@ export function Collection() {
   const rowVirtualizer = useVirtualizer({
     count: Math.ceil(filteredWines.length / 2),
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 140, // Estimated row height
-    overscan: 3,
+    estimateSize: () => 260, // Estimated row height
+    overscan: 5,
   });
 
   // Load more when scrolled near bottom
@@ -172,7 +219,7 @@ export function Collection() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold text-charcoal-900">Wine Collection</h1>
+            <h1 className="text-2xl font-display font-bold text-charcoal-900">🍷 Wine Collection</h1>
             <p className="text-charcoal-500">Loading your wines...</p>
           </div>
         </div>
@@ -209,19 +256,40 @@ export function Collection() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-charcoal-900">Wine Collection</h1>
+          <h1 className="text-2xl font-display font-bold text-charcoal-900">🍷 Wine Collection</h1>
           <p className="text-charcoal-500">
             {filteredWines.length} of {totalCount} wines
             {isFetching && <span className="ml-2 text-wine-600">• Syncing...</span>}
           </p>
         </div>
-        <Link
-          to="/add"
-          className="flex items-center gap-2 px-4 py-2 bg-wine-900 text-white rounded-lg hover:bg-wine-800 transition-colors font-medium text-sm"
-        >
-          <PlusCircle className="w-4 h-4" />
-          Add Wine
-        </Link>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end">
+            <button
+              onClick={handleRefreshPrices}
+              disabled={isUpdatingPrices || isPriceUpdateOnCooldown}
+              className="flex items-center gap-2 px-4 py-2 bg-wine-900 text-white rounded-lg hover:bg-wine-800 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isUpdatingPrices ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              {isUpdatingPrices ? 'Updating...' : 'Refresh Prices'}
+            </button>
+            {lastPricesUpdated !== null && (
+              <span className="text-xs text-charcoal-400 mt-0.5">
+                Last updated: {formatLastUpdated(lastPricesUpdated)}
+              </span>
+            )}
+          </div>
+          <Link
+            to="/add"
+            className="flex items-center gap-2 px-4 py-2 bg-wine-900 text-white rounded-lg hover:bg-wine-800 transition-colors font-medium text-sm"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add Wine
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-charcoal-100 p-4">
@@ -428,8 +496,8 @@ export function Collection() {
                     }}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
-                      {wine1 && <WineCard key={wine1.id} wine={wine1} />}
-                      {wine2 && <WineCard key={wine2.id} wine={wine2} />}
+                      {wine1 && <WineCard key={wine1.id} wine={wine1} scrollContainer={parentRef} />}
+                      {wine2 && <WineCard key={wine2.id} wine={wine2} scrollContainer={parentRef} />}
                     </div>
                   </div>
                 );
